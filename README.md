@@ -1,0 +1,49 @@
+# Python DB Traversal
+
+This project models a road network as a grid-based graph and finds a path between
+two points using Manhattan-distance pathfinding.
+
+## Concept
+
+- Each traversable grid cell is a node.
+- Each road connection between neighboring cells is an edge.
+- Movement is limited to up, down, left, and right.
+- No diagonal movement is allowed.
+- Manhattan distance is used as the heuristic for pathfinding.
+
+This makes the project a good fit for city-block style traversal where roads
+behave like a rectangular grid.
+
+## Project structure
+
+- `src/traversal/grid.py`: grid and node modeling
+- `src/traversal/pathfinding.py`: Manhattan-distance A* traversal
+- `main.py`: runnable example
+- `tests/test_pathfinding.py`: basic pathfinding tests
+
+## Run the demo UI
+
+```bash
+python3 main.py
+```
+
+This generates a simple HTML page at `demo_output/traversal_demo.html`.
+Open that file in your browser to show:
+
+- point A
+- point B
+- blocked cells
+- traversable roads
+- the final non-diagonal route
+
+## Run the console demo
+
+```bash
+python3 main.py --cli
+```
+
+## Run tests
+
+```bash
+python3 -m unittest discover -s tests
+```

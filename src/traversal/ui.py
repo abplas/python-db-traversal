@@ -1,0 +1,807 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from traversal.grid import Point
+
+
+BLOCKED_COLOR = "#d9dde3"
+PATH_COLOR = "#d97706"
+START_COLOR = "#16a34a"
+GOAL_COLOR = "#dc2626"
+GRID_LINE_COLOR = "#4b5563"
+PAGE_BACKGROUND = "#f5f5f4"
+PANEL_BACKGROUND = "#ffffff"
+TEXT_COLOR = "#111827"
+MUTED_TEXT = "#6b7280"
+
+
+def launch_demo_ui(grid: list[list[int]], start: Point, goal: Point) -> Path:
+    """Build a browser-based demo page and return its file path."""
+    output_dir = Path.cwd() / "demo_output"
+    output_dir.mkdir(exist_ok=True)
+
+    output_path = output_dir / "traversal_demo.html"
+    output_path.write_text(build_demo_html(grid, start, goal), encoding="utf-8")
+    return output_path
+
+
+def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
+    initial_state = {
+        "grid": grid,
+        "start": {"row": start.row, "col": start.col},
+        "goal": {"row": goal.row, "col": goal.col},
+    }
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Traversal Demo</title>
+  <style>
+    :root {{
+      --bg: {PAGE_BACKGROUND};
+      --panel: {PANEL_BACKGROUND};
+      --text: {TEXT_COLOR};
+      --muted: {MUTED_TEXT};
+      --line: {GRID_LINE_COLOR};
+      --blocked: {BLOCKED_COLOR};
+      --path: {PATH_COLOR};
+      --start: {START_COLOR};
+      --goal: {GOAL_COLOR};
+    }}
+
+    * {{
+      box-sizing: border-box;
+    }}
+
+    body {{
+      margin: 0;
+      padding: 28px 20px 40px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Helvetica Neue", "Avenir Next", sans-serif;
+    }}
+
+    .layout {{
+      max-width: 1120px;
+      margin: 0 auto;
+    }}
+
+    .topbar {{
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 16px;
+      margin-bottom: 18px;
+    }}
+
+    h1 {{
+      margin: 0 0 6px;
+      font-size: 1.9rem;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+    }}
+
+    p {{
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }}
+
+    .meta {{
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }}
+
+    .chip {{
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      background: #fafaf9;
+      border-radius: 999px;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }}
+
+    .panel {{
+      background: var(--panel);
+      border: 1px solid #d1d5db;
+      padding: 16px;
+    }}
+
+    .panel h2 {{
+      margin: 0 0 14px;
+      font-size: 1rem;
+      letter-spacing: 0.01em;
+    }}
+
+    .controls {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }}
+
+    .field {{
+      display: grid;
+      gap: 8px;
+    }}
+
+    .field label {{
+      font-size: 0.9rem;
+      color: var(--muted);
+    }}
+
+    .field output {{
+      font-weight: 700;
+      color: var(--text);
+    }}
+
+    input[type="range"],
+    button {{
+      width: 100%;
+      font: inherit;
+    }}
+
+    button {{
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      color: var(--text);
+    }}
+
+    button {{
+      cursor: pointer;
+      text-align: left;
+    }}
+
+    button.primary {{
+      background: #111827;
+      color: #ffffff;
+      border-color: #111827;
+    }}
+
+    .hint {{
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }}
+
+    .figure {{
+      background: var(--panel);
+      border: 1px solid #d1d5db;
+      padding: 18px;
+      overflow-x: auto;
+    }}
+
+    svg {{
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      height: auto;
+    }}
+
+    .legend {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }}
+
+    .legend-item {{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      background: #fafaf9;
+      border: 1px solid #e5e7eb;
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }}
+
+    .swatch {{
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(17, 24, 39, 0.18);
+    }}
+
+    .route {{
+      margin-top: 16px;
+      padding: 14px 16px;
+      background: #ffffff;
+      border: 1px solid #d1d5db;
+      color: #374151;
+      font-family: "SFMono-Regular", "Menlo", monospace;
+      font-size: 0.92rem;
+      overflow-x: auto;
+      white-space: nowrap;
+    }}
+
+    .grid-line {{
+      stroke: var(--line);
+      stroke-width: 1.4;
+    }}
+
+    .axis-label {{
+      fill: var(--muted);
+      font-size: 13px;
+      font-family: "SFMono-Regular", "Menlo", monospace;
+    }}
+
+    .marker-label {{
+      fill: #111827;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: "Helvetica Neue", "Avenir Next", sans-serif;
+      pointer-events: none;
+    }}
+
+    .click-zone {{
+      fill: transparent;
+      cursor: pointer;
+    }}
+
+    .status {{
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: #fafaf9;
+      border: 1px solid #e5e7eb;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }}
+
+    .status.active {{
+      color: var(--text);
+      border-color: #86efac;
+      background: #f0fdf4;
+    }}
+
+    .bottom-panel {{
+      margin-top: 18px;
+    }}
+
+    .actions {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }}
+
+    .actions button {{
+      width: auto;
+      min-width: 180px;
+      text-align: center;
+    }}
+
+    @media (max-width: 860px) {{
+      .topbar {{
+        align-items: start;
+        flex-direction: column;
+      }}
+    }}
+  </style>
+</head>
+<body>
+  <main class="layout">
+    <section class="topbar">
+      <div>
+        <h1>Traversal Grid</h1>
+        <p>Pick points, regenerate roadblocks, and trace new Manhattan-style routes.</p>
+      </div>
+      <div class="meta">
+        <div class="chip" id="start-chip">A: (0, 0)</div>
+        <div class="chip" id="goal-chip">B: (0, 0)</div>
+        <div class="chip" id="moves-chip">Moves: 0</div>
+      </div>
+    </section>
+
+    <div class="figure">
+      <svg id="grid-svg" role="img" aria-label="Traversal grid"></svg>
+    </div>
+
+    <section class="legend">
+      <div class="legend-item"><span class="swatch" style="background:{START_COLOR};"></span>Point A</div>
+      <div class="legend-item"><span class="swatch" style="background:{GOAL_COLOR};"></span>Point B</div>
+      <div class="legend-item"><span class="swatch" style="background:{PATH_COLOR};"></span>Route</div>
+      <div class="legend-item"><span class="swatch" style="background:{BLOCKED_COLOR};"></span>Blocked</div>
+    </section>
+
+    <section class="route" id="route-text">Route will appear here.</section>
+
+    <section class="panel bottom-panel">
+      <h2>Controls</h2>
+      <div class="controls">
+        <div class="field">
+          <label for="density">Roadblock Density: <output id="density-value">30%</output></label>
+          <input id="density" type="range" min="5" max="65" value="30" />
+        </div>
+
+        <div class="field">
+          <label for="rows">Rows: <output id="rows-value">5</output></label>
+          <input id="rows" type="range" min="4" max="10" value="5" />
+        </div>
+
+        <div class="field">
+          <label for="cols">Columns: <output id="cols-value">7</output></label>
+          <input id="cols" type="range" min="4" max="12" value="7" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="primary" id="find-route">Find route</button>
+        <button id="generate-grid">Generate new grid</button>
+        <button id="toggle-block-mode">Roadblock edit: Off</button>
+        <button id="clear-blocks">Clear roadblocks</button>
+      </div>
+
+      <div class="hint">
+        Click A or B once to select it, then click a new grid intersection to move it and recalculate the route.
+        Turn on roadblock edit if you want to click cell squares to add or remove blockers.
+      </div>
+      <div class="status" id="status-text">Ready.</div>
+    </section>
+  </main>
+
+  <script>
+    const INITIAL_STATE = {json.dumps(initial_state)};
+    const CELL_SIZE = 72;
+    const MARGIN = 56;
+    const SVG_NS = "http://www.w3.org/2000/svg";
+
+    const state = {{
+      grid: structuredClone(INITIAL_STATE.grid),
+      start: {{ ...INITIAL_STATE.start }},
+      goal: {{ ...INITIAL_STATE.goal }},
+      path: [],
+    }};
+
+    const svg = document.getElementById("grid-svg");
+    const densityInput = document.getElementById("density");
+    const rowsInput = document.getElementById("rows");
+    const colsInput = document.getElementById("cols");
+    const densityValue = document.getElementById("density-value");
+    const rowsValue = document.getElementById("rows-value");
+    const colsValue = document.getElementById("cols-value");
+    const routeText = document.getElementById("route-text");
+    const statusText = document.getElementById("status-text");
+    const startChip = document.getElementById("start-chip");
+    const goalChip = document.getElementById("goal-chip");
+    const movesChip = document.getElementById("moves-chip");
+    const blockModeButton = document.getElementById("toggle-block-mode");
+
+    let activeMarker = null;
+    let blockMode = false;
+
+    rowsInput.value = state.grid.length;
+    colsInput.value = state.grid[0].length;
+    rowsValue.textContent = rowsInput.value;
+    colsValue.textContent = colsInput.value;
+    densityValue.textContent = densityInput.value + "%";
+
+    function pointKey(point) {{
+      return `${{point.row}},${{point.col}}`;
+    }}
+
+    function inBounds(point) {{
+      return (
+        point.row >= 0 &&
+        point.row < state.grid.length &&
+        point.col >= 0 &&
+        point.col < state.grid[0].length
+      );
+    }}
+
+    function isRoad(point) {{
+      return inBounds(point) && state.grid[point.row][point.col] === 1;
+    }}
+
+    function neighbors(point) {{
+      const options = [
+        {{ row: point.row - 1, col: point.col }},
+        {{ row: point.row + 1, col: point.col }},
+        {{ row: point.row, col: point.col - 1 }},
+        {{ row: point.row, col: point.col + 1 }},
+      ];
+      return options.filter(isRoad);
+    }}
+
+    function manhattan(a, b) {{
+      return Math.abs(a.row - b.row) + Math.abs(a.col - b.col);
+    }}
+
+    function findPath() {{
+      if (!isRoad(state.start) || !isRoad(state.goal)) {{
+        state.path = [];
+        updateStatus("Point A and point B must both be on open intersections.");
+        render();
+        return;
+      }}
+
+      const frontier = [{{ point: state.start, priority: 0 }}];
+      const cameFrom = new Map();
+      const costSoFar = new Map([[pointKey(state.start), 0]]);
+
+      while (frontier.length > 0) {{
+        frontier.sort((a, b) => a.priority - b.priority);
+        const current = frontier.shift().point;
+
+        if (current.row === state.goal.row && current.col === state.goal.col) {{
+          state.path = reconstructPath(cameFrom, current);
+          updateStatus(`Route found with ${{state.path.length - 1}} moves.`);
+          render();
+          return;
+        }}
+
+        for (const neighbor of neighbors(current)) {{
+          const currentCost = costSoFar.get(pointKey(current));
+          const newCost = currentCost + 1;
+          const neighborKey = pointKey(neighbor);
+
+          if (!costSoFar.has(neighborKey) || newCost < costSoFar.get(neighborKey)) {{
+            costSoFar.set(neighborKey, newCost);
+            const priority = newCost + manhattan(neighbor, state.goal);
+            frontier.push({{ point: neighbor, priority }});
+            cameFrom.set(neighborKey, current);
+          }}
+        }}
+      }}
+
+      state.path = [];
+      updateStatus("No route is available with the current roadblocks.");
+      render();
+    }}
+
+    function reconstructPath(cameFrom, current) {{
+      const path = [current];
+      let cursor = current;
+
+      while (cameFrom.has(pointKey(cursor))) {{
+        cursor = cameFrom.get(pointKey(cursor));
+        path.push(cursor);
+      }}
+
+      return path.reverse();
+    }}
+
+    function generateRandomGrid(rows, cols, density, attempts = 40) {{
+      for (let attempt = 0; attempt < attempts; attempt += 1) {{
+        const grid = Array.from({{ length: rows }}, () =>
+          Array.from({{ length: cols }}, () => (Math.random() < density ? 0 : 1))
+        );
+
+        const start = {{ row: 0, col: 0 }};
+        const goal = {{ row: rows - 1, col: cols - 1 }};
+        grid[start.row][start.col] = 1;
+        grid[goal.row][goal.col] = 1;
+
+        state.grid = grid;
+        state.start = start;
+        state.goal = goal;
+        state.path = [];
+
+        if (pathExists()) {{
+          return true;
+        }}
+      }}
+
+      return false;
+    }}
+
+    function pathExists() {{
+      const queue = [state.start];
+      const visited = new Set([pointKey(state.start)]);
+
+      while (queue.length > 0) {{
+        const current = queue.shift();
+        if (current.row === state.goal.row && current.col === state.goal.col) {{
+          return true;
+        }}
+
+        for (const neighbor of neighbors(current)) {{
+          const key = pointKey(neighbor);
+          if (!visited.has(key)) {{
+            visited.add(key);
+            queue.push(neighbor);
+          }}
+        }}
+      }}
+
+      return false;
+    }}
+
+    function setIntersection(row, col) {{
+      if (!activeMarker) {{
+        updateStatus("Click A or B first, then click a new grid intersection.");
+        return;
+      }}
+
+      const point = {{ row, col }};
+      state.grid[row][col] = 1;
+
+      if (activeMarker === "start") {{
+        state.start = point;
+        updateStatus(`Point A moved to (${{row}}, ${{col}}).`);
+      }} else if (activeMarker === "goal") {{
+        state.goal = point;
+        updateStatus(`Point B moved to (${{row}}, ${{col}}).`);
+      }}
+
+      activeMarker = null;
+      syncStatusAppearance();
+      findPath();
+    }}
+
+    function toggleCell(row, col) {{
+      if (!blockMode) {{
+        return;
+      }}
+
+      const protectedStart = state.start.row === row && state.start.col === col;
+      const protectedGoal = state.goal.row === row && state.goal.col === col;
+      if (protectedStart || protectedGoal) {{
+        updateStatus("Point A and point B cannot be blocked.");
+        return;
+      }}
+
+      state.grid[row][col] = state.grid[row][col] === 1 ? 0 : 1;
+      findPath();
+    }}
+
+    function updateStatus(message) {{
+      statusText.textContent = message;
+    }}
+
+    function syncStatusAppearance() {{
+      if (activeMarker) {{
+        statusText.classList.add("active");
+      }} else {{
+        statusText.classList.remove("active");
+      }}
+    }}
+
+    function selectMarker(markerName) {{
+      activeMarker = markerName;
+      blockMode = false;
+      blockModeButton.textContent = "Roadblock edit: Off";
+      const label = markerName === "start" ? "A" : "B";
+      updateStatus(`Point ${{label}} selected. Click a new grid intersection to move it.`);
+      syncStatusAppearance();
+      render();
+    }}
+
+    function clearRoadblocks() {{
+      state.grid = state.grid.map(row => row.map(() => 1));
+      state.grid[state.start.row][state.start.col] = 1;
+      state.grid[state.goal.row][state.goal.col] = 1;
+      updateStatus("All roadblocks cleared.");
+      findPath();
+    }}
+
+    function render() {{
+      const rows = state.grid.length;
+      const cols = state.grid[0].length;
+      const boardWidth = (cols - 1) * CELL_SIZE;
+      const boardHeight = (rows - 1) * CELL_SIZE;
+      const svgWidth = boardWidth + MARGIN * 2;
+      const svgHeight = boardHeight + MARGIN * 2;
+
+      svg.setAttribute("viewBox", `0 0 ${{svgWidth}} ${{svgHeight}}`);
+      svg.innerHTML = "";
+
+      const background = document.createElementNS(SVG_NS, "rect");
+      background.setAttribute("x", "0");
+      background.setAttribute("y", "0");
+      background.setAttribute("width", String(svgWidth));
+      background.setAttribute("height", String(svgHeight));
+      background.setAttribute("fill", "#ffffff");
+      svg.appendChild(background);
+
+      for (let row = 0; row < rows; row += 1) {{
+        for (let col = 0; col < cols; col += 1) {{
+          if (state.grid[row][col] === 0) {{
+            const x = MARGIN + col * CELL_SIZE;
+            const y = MARGIN + row * CELL_SIZE;
+            const blocked = document.createElementNS(SVG_NS, "rect");
+            blocked.setAttribute("x", String(x - CELL_SIZE * 0.36));
+            blocked.setAttribute("y", String(y - CELL_SIZE * 0.36));
+            blocked.setAttribute("width", String(CELL_SIZE * 0.72));
+            blocked.setAttribute("height", String(CELL_SIZE * 0.72));
+            blocked.setAttribute("rx", "8");
+            blocked.setAttribute("fill", "var(--blocked)");
+            blocked.setAttribute("opacity", "0.9");
+            svg.appendChild(blocked);
+          }}
+        }}
+      }}
+
+      for (let col = 0; col < cols; col += 1) {{
+        const x = MARGIN + col * CELL_SIZE;
+        const line = document.createElementNS(SVG_NS, "line");
+        line.setAttribute("x1", String(x));
+        line.setAttribute("y1", String(MARGIN));
+        line.setAttribute("x2", String(x));
+        line.setAttribute("y2", String(MARGIN + boardHeight));
+        line.setAttribute("class", "grid-line");
+        svg.appendChild(line);
+      }}
+
+      for (let row = 0; row < rows; row += 1) {{
+        const y = MARGIN + row * CELL_SIZE;
+        const line = document.createElementNS(SVG_NS, "line");
+        line.setAttribute("x1", String(MARGIN));
+        line.setAttribute("y1", String(y));
+        line.setAttribute("x2", String(MARGIN + boardWidth));
+        line.setAttribute("y2", String(y));
+        line.setAttribute("class", "grid-line");
+        svg.appendChild(line);
+      }}
+
+      if (state.path.length > 0) {{
+        const polyline = document.createElementNS(SVG_NS, "polyline");
+        polyline.setAttribute(
+          "points",
+          state.path
+            .map(point => `${{MARGIN + point.col * CELL_SIZE}},${{MARGIN + point.row * CELL_SIZE}}`)
+            .join(" ")
+        );
+        polyline.setAttribute("fill", "none");
+        polyline.setAttribute("stroke", "var(--path)");
+        polyline.setAttribute("stroke-width", "8");
+        polyline.setAttribute("stroke-linecap", "round");
+        polyline.setAttribute("stroke-linejoin", "round");
+        svg.appendChild(polyline);
+
+        for (const point of state.path) {{
+          const node = document.createElementNS(SVG_NS, "circle");
+          node.setAttribute("cx", String(MARGIN + point.col * CELL_SIZE));
+          node.setAttribute("cy", String(MARGIN + point.row * CELL_SIZE));
+          node.setAttribute("r", "8");
+          node.setAttribute("fill", "var(--path)");
+          node.setAttribute("stroke", "#ffffff");
+          node.setAttribute("stroke-width", "2");
+          svg.appendChild(node);
+        }}
+      }}
+
+      for (let row = 0; row < rows; row += 1) {{
+        const y = MARGIN + row * CELL_SIZE;
+        const label = document.createElementNS(SVG_NS, "text");
+        label.setAttribute("x", String(MARGIN - 22));
+        label.setAttribute("y", String(y + 5));
+        label.setAttribute("class", "axis-label");
+        label.textContent = String(row);
+        svg.appendChild(label);
+      }}
+
+      for (let col = 0; col < cols; col += 1) {{
+        const x = MARGIN + col * CELL_SIZE;
+        const label = document.createElementNS(SVG_NS, "text");
+        label.setAttribute("x", String(x));
+        label.setAttribute("y", String(MARGIN - 18));
+        label.setAttribute("text-anchor", "middle");
+        label.setAttribute("class", "axis-label");
+        label.textContent = String(col);
+        svg.appendChild(label);
+      }}
+
+      for (let row = 0; row < rows; row += 1) {{
+        for (let col = 0; col < cols; col += 1) {{
+          const x = MARGIN + col * CELL_SIZE;
+          const y = MARGIN + row * CELL_SIZE;
+
+          const cellZone = document.createElementNS(SVG_NS, "rect");
+          cellZone.setAttribute("x", String(x - CELL_SIZE * 0.34));
+          cellZone.setAttribute("y", String(y - CELL_SIZE * 0.34));
+          cellZone.setAttribute("width", String(CELL_SIZE * 0.68));
+          cellZone.setAttribute("height", String(CELL_SIZE * 0.68));
+          cellZone.setAttribute("rx", "8");
+          cellZone.setAttribute("class", "click-zone");
+          cellZone.addEventListener("click", () => toggleCell(row, col));
+          svg.appendChild(cellZone);
+
+          const intersectionZone = document.createElementNS(SVG_NS, "circle");
+          intersectionZone.setAttribute("cx", String(x));
+          intersectionZone.setAttribute("cy", String(y));
+          intersectionZone.setAttribute("r", "18");
+          intersectionZone.setAttribute("class", "click-zone");
+          intersectionZone.addEventListener("click", () => setIntersection(row, col));
+          svg.appendChild(intersectionZone);
+        }}
+      }}
+
+      drawMarker(state.start, "A", "var(--start)", "start");
+      drawMarker(state.goal, "B", "var(--goal)", "goal");
+
+      startChip.textContent = `A: (${{state.start.row}}, ${{state.start.col}})`;
+      goalChip.textContent = `B: (${{state.goal.row}}, ${{state.goal.col}})`;
+      movesChip.textContent = `Moves: ${{Math.max(state.path.length - 1, 0)}}`;
+      routeText.textContent = state.path.length
+        ? state.path.map(point => `(${{point.row}}, ${{point.col}})`).join(" -> ")
+        : "No route found for the current layout.";
+    }}
+
+    function drawMarker(point, labelText, fill, markerName) {{
+      const x = MARGIN + point.col * CELL_SIZE;
+      const y = MARGIN + point.row * CELL_SIZE;
+
+      const marker = document.createElementNS(SVG_NS, "circle");
+      marker.setAttribute("cx", String(x));
+      marker.setAttribute("cy", String(y));
+      marker.setAttribute("r", "16");
+      marker.setAttribute("fill", fill);
+      marker.setAttribute("stroke", "#ffffff");
+      marker.setAttribute("stroke-width", activeMarker === markerName ? "5" : "3");
+      marker.style.cursor = "pointer";
+      marker.addEventListener("click", (event) => {{
+        event.stopPropagation();
+        selectMarker(markerName);
+      }});
+      svg.appendChild(marker);
+
+      const label = document.createElementNS(SVG_NS, "text");
+      label.setAttribute("x", String(x));
+      label.setAttribute("y", String(y + 6));
+      label.setAttribute("text-anchor", "middle");
+      label.setAttribute("class", "marker-label");
+      label.textContent = labelText;
+      label.style.cursor = "pointer";
+      label.addEventListener("click", (event) => {{
+        event.stopPropagation();
+        selectMarker(markerName);
+      }});
+      svg.appendChild(label);
+    }}
+
+    densityInput.addEventListener("input", () => {{
+      densityValue.textContent = densityInput.value + "%";
+    }});
+
+    rowsInput.addEventListener("input", () => {{
+      rowsValue.textContent = rowsInput.value;
+    }});
+
+    colsInput.addEventListener("input", () => {{
+      colsValue.textContent = colsInput.value;
+    }});
+
+    document.getElementById("find-route").addEventListener("click", findPath);
+
+    document.getElementById("generate-grid").addEventListener("click", () => {{
+      const rows = Number(rowsInput.value);
+      const cols = Number(colsInput.value);
+      const density = Number(densityInput.value) / 100;
+      const success = generateRandomGrid(rows, cols, density);
+
+      if (success) {{
+        updateStatus("Generated a new grid and found a valid route.");
+        findPath();
+      }} else {{
+        updateStatus("Could not generate a connected grid with that density. Try lowering it.");
+        render();
+      }}
+    }});
+
+    document.getElementById("clear-blocks").addEventListener("click", clearRoadblocks);
+
+    blockModeButton.addEventListener("click", () => {{
+      blockMode = !blockMode;
+      activeMarker = null;
+      blockModeButton.textContent = `Roadblock edit: ${{blockMode ? "On" : "Off"}}`;
+      updateStatus(
+        blockMode
+          ? "Roadblock edit is on. Click a cell square to add or remove blockers."
+          : "Roadblock edit is off."
+      );
+      syncStatusAppearance();
+      render();
+    }});
+
+    findPath();
+  </script>
+</body>
+</html>
+"""
