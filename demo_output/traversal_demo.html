@@ -224,6 +224,18 @@
       background: #f0fdf4;
     }
 
+    .status.error {
+      color: #991b1b;
+      border-color: #fca5a5;
+      background: #fef2f2;
+    }
+
+    .status.info {
+      color: #1d4ed8;
+      border-color: #93c5fd;
+      background: #eff6ff;
+    }
+
     .bottom-panel {
       margin-top: 18px;
     }
@@ -239,6 +251,71 @@
       width: auto;
       min-width: 180px;
       text-align: center;
+    }
+
+    .stack {
+      display: grid;
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .algorithm-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .checkbox-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      border-radius: 12px;
+      color: var(--text);
+    }
+
+    .checkbox-chip input {
+      width: auto;
+      margin: 0;
+    }
+
+    .api-note {
+      padding: 12px 14px;
+      border: 1px solid #dbeafe;
+      background: #f8fbff;
+      color: #1e3a8a;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .comparison-panel {
+      margin-top: 18px;
+    }
+
+    .comparison-panel table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+    }
+
+    .comparison-panel th,
+    .comparison-panel td {
+      border-bottom: 1px solid #e5e7eb;
+      padding: 10px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .comparison-panel th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .comparison-empty {
+      color: var(--muted);
+      font-size: 0.92rem;
     }
 
     @media (max-width: 860px) {
@@ -295,8 +372,33 @@
         </div>
       </div>
 
+      <div class="stack">
+        <div class="field">
+          <label>Algorithms</label>
+          <div class="algorithm-options">
+            <label class="checkbox-chip">
+              <input type="checkbox" id="algorithm-astar" name="algorithm" value="astar" checked />
+              <span>A*</span>
+            </label>
+            <label class="checkbox-chip">
+              <input type="checkbox" id="algorithm-dijkstra" name="algorithm" value="dijkstra" />
+              <span>Dijkstra</span>
+            </label>
+            <label class="checkbox-chip">
+              <input type="checkbox" id="algorithm-all" name="algorithm-all" value="all" />
+              <span>Run all</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="api-note">
+          To use backend algorithm comparison, start the API server first:
+          <code>PYTHONPATH=src python3 -m uvicorn traversal.api:app --reload</code>
+        </div>
+      </div>
+
       <div class="actions">
-        <button class="primary" id="find-route">Find route</button>
+        <button class="primary" id="find-route">Run selected algorithms</button>
         <button id="generate-grid">Generate new grid</button>
         <button id="toggle-block-mode">Roadblock edit: Off</button>
         <button id="clear-blocks">Clear roadblocks</button>
@@ -307,11 +409,35 @@
         Turn on roadblock edit if you want to click cell squares to add or remove blockers.
       </div>
       <div class="status" id="status-text">Ready.</div>
+      <div class="status info" id="api-status-text">Backend status: waiting to run.</div>
+    </section>
+
+    <section class="panel comparison-panel">
+      <h2>Algorithm comparison</h2>
+      <div class="comparison-empty" id="comparison-empty">
+        Run the backend comparison to see A*, Dijkstra, or all registered algorithms side by side.
+      </div>
+      <table id="comparison-table" hidden>
+        <thead>
+          <tr>
+            <th>Algorithm</th>
+            <th>Path Found</th>
+            <th>Moves</th>
+            <th>Runtime ms</th>
+            <th>Visited</th>
+            <th>Expanded</th>
+            <th>Frontier Pushes</th>
+            <th>Path Cost</th>
+          </tr>
+        </thead>
+        <tbody id="comparison-body"></tbody>
+      </table>
     </section>
   </main>
 
   <script>
     const INITIAL_STATE = {"grid": [[1, 1, 1, 1, 1, 0, 1], [0, 0, 1, 0, 1, 0, 1], [1, 1, 1, 0, 1, 1, 1], [1, 0, 0, 0, 1, 0, 0], [1, 1, 1, 1, 1, 1, 1]], "start": {"row": 0, "col": 0}, "goal": {"row": 4, "col": 6}};
+    const API_URL = "http://127.0.0.1:8000/run-pathfinding";
     const CELL_SIZE = 72;
     const MARGIN = 56;
     const SVG_NS = "http://www.w3.org/2000/svg";
@@ -321,6 +447,7 @@
       start: { ...INITIAL_STATE.start },
       goal: { ...INITIAL_STATE.goal },
       path: [],
+      results: [],
     };
 
     const svg = document.getElementById("grid-svg");
@@ -332,10 +459,19 @@
     const colsValue = document.getElementById("cols-value");
     const routeText = document.getElementById("route-text");
     const statusText = document.getElementById("status-text");
+    const apiStatusText = document.getElementById("api-status-text");
     const startChip = document.getElementById("start-chip");
     const goalChip = document.getElementById("goal-chip");
     const movesChip = document.getElementById("moves-chip");
     const blockModeButton = document.getElementById("toggle-block-mode");
+    const comparisonTable = document.getElementById("comparison-table");
+    const comparisonBody = document.getElementById("comparison-body");
+    const comparisonEmpty = document.getElementById("comparison-empty");
+    const runAllCheckbox = document.getElementById("algorithm-all");
+    const individualAlgorithmCheckboxes = [
+      document.getElementById("algorithm-astar"),
+      document.getElementById("algorithm-dijkstra"),
+    ];
 
     let activeMarker = null;
     let blockMode = false;
@@ -377,12 +513,61 @@
       return Math.abs(a.row - b.row) + Math.abs(a.col - b.col);
     }
 
-    function findPath() {
+    function setApiStatus(message, tone = "info") {
+      apiStatusText.textContent = message;
+      apiStatusText.classList.remove("info", "active", "error");
+      apiStatusText.classList.add(tone);
+    }
+
+    function clearComparisonResults(message = "Run the backend comparison to see A*, Dijkstra, or all registered algorithms side by side.") {
+      state.results = [];
+      comparisonBody.innerHTML = "";
+      comparisonTable.hidden = true;
+      comparisonEmpty.hidden = false;
+      comparisonEmpty.textContent = message;
+    }
+
+    function renderComparisonResults(results) {
+      state.results = results;
+      comparisonBody.innerHTML = "";
+
+      for (const result of results) {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${result.algorithm_name}</td>
+          <td>${result.path_found ? "Yes" : "No"}</td>
+          <td>${result.moves}</td>
+          <td>${result.runtime_ms}</td>
+          <td>${result.visited_count}</td>
+          <td>${result.expanded_count}</td>
+          <td>${result.frontier_pushes}</td>
+          <td>${result.path_cost ?? "N/A"}</td>
+        `;
+        comparisonBody.appendChild(row);
+      }
+
+      comparisonEmpty.hidden = true;
+      comparisonTable.hidden = false;
+    }
+
+    function getSelectedAlgorithms() {
+      if (runAllCheckbox.checked) {
+        return "all";
+      }
+
+      const selected = individualAlgorithmCheckboxes
+        .filter(checkbox => checkbox.checked)
+        .map(checkbox => checkbox.value);
+
+      return selected.length > 0 ? selected : null;
+    }
+
+    function findPathInBrowser() {
       if (!isRoad(state.start) || !isRoad(state.goal)) {
         state.path = [];
         updateStatus("Point A and point B must both be on open intersections.");
         render();
-        return;
+        return null;
       }
 
       const frontier = [{ point: state.start, priority: 0 }];
@@ -397,7 +582,7 @@
           state.path = reconstructPath(cameFrom, current);
           updateStatus(`Route found with ${state.path.length - 1} moves.`);
           render();
-          return;
+          return state.path;
         }
 
         for (const neighbor of neighbors(current)) {
@@ -417,6 +602,7 @@
       state.path = [];
       updateStatus("No route is available with the current roadblocks.");
       render();
+      return null;
     }
 
     function reconstructPath(cameFrom, current) {
@@ -496,7 +682,8 @@
 
       activeMarker = null;
       syncStatusAppearance();
-      findPath();
+      clearComparisonResults("Grid changed. Run the backend comparison again to refresh the table.");
+      findPathInBrowser();
     }
 
     function toggleCell(row, col) {
@@ -512,7 +699,8 @@
       }
 
       state.grid[row][col] = state.grid[row][col] === 1 ? 0 : 1;
-      findPath();
+      clearComparisonResults("Grid changed. Run the backend comparison again to refresh the table.");
+      findPathInBrowser();
     }
 
     function updateStatus(message) {
@@ -542,7 +730,63 @@
       state.grid[state.start.row][state.start.col] = 1;
       state.grid[state.goal.row][state.goal.col] = 1;
       updateStatus("All roadblocks cleared.");
-      findPath();
+      clearComparisonResults("Roadblocks changed. Run the backend comparison again to refresh the table.");
+      findPathInBrowser();
+    }
+
+    async function runBackendPathfinding() {
+      const selectedAlgorithms = getSelectedAlgorithms();
+
+      if (!selectedAlgorithms) {
+        setApiStatus("Select at least one algorithm or choose Run all before sending the backend request.", "error");
+        return;
+      }
+
+      setApiStatus("Backend request running...", "active");
+
+      try {
+        const response = await fetch(API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            grid: state.grid,
+            start: state.start,
+            goal: state.goal,
+            algorithms: selectedAlgorithms,
+          }),
+        });
+
+        const payload = await response.json();
+
+        if (!response.ok) {
+          const detail = payload.detail || "The backend request failed.";
+          throw new Error(detail);
+        }
+
+        renderComparisonResults(payload.results);
+
+        const firstSuccessfulResult = payload.results.find(result => result.path_found);
+        if (firstSuccessfulResult) {
+          state.path = firstSuccessfulResult.path;
+          // Future improvement: draw different algorithm paths in different colors.
+          updateStatus(`Showing the first successful backend route from ${firstSuccessfulResult.algorithm_name}.`);
+        } else {
+          state.path = [];
+          updateStatus("The backend ran successfully, but no algorithm found a route.");
+        }
+
+        render();
+        setApiStatus("Backend request succeeded.", "active");
+      } catch (error) {
+        clearComparisonResults("No backend comparison results are available yet.");
+        findPathInBrowser();
+        setApiStatus(
+          "Could not reach the FastAPI server. Start it with: PYTHONPATH=src python3 -m uvicorn traversal.api:app --reload",
+          "error"
+        );
+      }
     }
 
     function render() {
@@ -732,7 +976,23 @@
       colsValue.textContent = colsInput.value;
     });
 
-    document.getElementById("find-route").addEventListener("click", findPath);
+    runAllCheckbox.addEventListener("change", () => {
+      if (runAllCheckbox.checked) {
+        individualAlgorithmCheckboxes.forEach(checkbox => {
+          checkbox.checked = false;
+        });
+      }
+    });
+
+    individualAlgorithmCheckboxes.forEach(checkbox => {
+      checkbox.addEventListener("change", () => {
+        if (checkbox.checked) {
+          runAllCheckbox.checked = false;
+        }
+      });
+    });
+
+    document.getElementById("find-route").addEventListener("click", runBackendPathfinding);
 
     document.getElementById("generate-grid").addEventListener("click", () => {
       const rows = Number(rowsInput.value);
@@ -742,7 +1002,8 @@
 
       if (success) {
         updateStatus("Generated a new grid and found a valid route.");
-        findPath();
+        clearComparisonResults("Grid changed. Run the backend comparison again to refresh the table.");
+        findPathInBrowser();
       } else {
         updateStatus("Could not generate a connected grid with that density. Try lowering it.");
         render();
@@ -764,7 +1025,8 @@
       render();
     });
 
-    findPath();
+    clearComparisonResults();
+    findPathInBrowser();
   </script>
 </body>
 </html>
