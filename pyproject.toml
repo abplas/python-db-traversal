@@ -8,6 +8,15 @@ version = "0.1.0"
 description = "Grid-based traversal project using Manhattan-distance pathfinding."
 readme = "README.md"
 requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+]
+
+[project.optional-dependencies]
+test = [
+    "httpx",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
