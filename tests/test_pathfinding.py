@@ -67,6 +67,33 @@ class PathfindingTests(unittest.TestCase):
         self.assertEqual(a_star_result.moves, dijkstra_result.moves)
         self.assertEqual(a_star_result.path_cost, dijkstra_result.path_cost)
 
+    def test_directional_traffic_changes_path_cost_without_breaking_path(self) -> None:
+        traffic = GridMap._neutral_traffic(3, 3)
+        traffic["east"][0][0] = 3.5
+        grid_map = GridMap(
+            [
+                [1, 1, 1],
+                [0, 0, 1],
+                [1, 1, 1],
+            ],
+            traffic=traffic,
+        )
+
+        result = dijkstra(grid_map, self.start, self.goal)
+
+        self.assertTrue(result.path_found)
+        self.assertEqual(result.path[0], self.start)
+        self.assertEqual(result.path[-1], self.goal)
+        self.assertGreater(result.path_cost, result.moves)
+
+    def test_result_metadata_includes_graph_complexity(self) -> None:
+        result = a_star(self.simple_grid, self.start, self.goal)
+
+        self.assertEqual(result.metadata["time_complexity"], "O((V + E) log V)")
+        self.assertEqual(result.metadata["space_complexity"], "O(V)")
+        self.assertGreaterEqual(result.metadata["node_count"], 1)
+        self.assertGreaterEqual(result.metadata["edge_count"], 1)
+
     def test_find_path_returns_empty_when_unreachable(self) -> None:
         grid_map = GridMap(
             [

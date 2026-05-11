@@ -22,6 +22,7 @@ class PathfindingRequest(BaseModel):
     start: PointRequest
     goal: PointRequest
     algorithms: Literal["all"] | str | list[str]
+    traffic: dict[str, list[list[float]]] | None = None
 
 
 app = FastAPI(title="Pathfinding API")
@@ -70,6 +71,12 @@ def run_pathfinding(payload: PathfindingRequest) -> dict[str, object]:
     goal = Point(payload.goal.row, payload.goal.col)
 
     try:
-        return run_pathfinding_request(payload.grid, start, goal, payload.algorithms)
+        return run_pathfinding_request(
+            payload.grid,
+            start,
+            goal,
+            payload.algorithms,
+            traffic=payload.traffic,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -6,6 +6,8 @@ Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 Requires-Dist: fastapi
 Requires-Dist: uvicorn
+Provides-Extra: test
+Requires-Dist: httpx; extra == "test"
 
 # Python DB Traversal
 

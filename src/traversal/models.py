@@ -15,7 +15,7 @@ class PathfindingResult:
     algorithm_name: str
     path: list[Point]
     path_found: bool
-    path_cost: int | None
+    path_cost: float | None
     path_length_nodes: int
     moves: int
     runtime_ms: int
