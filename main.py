@@ -1,5 +1,6 @@
 from pathlib import Path
 import argparse
+import random
 import sys
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -14,14 +15,47 @@ from traversal import (
 from traversal.ui import launch_demo_ui
 
 
-def build_demo_grid() -> list[list[int]]:
-    return [
-        [1, 1, 1, 1, 1, 0, 1],
-        [0, 0, 1, 0, 1, 0, 1],
-        [1, 1, 1, 0, 1, 1, 1],
-        [1, 0, 0, 0, 1, 0, 0],
-        [1, 1, 1, 1, 1, 1, 1],
-    ]
+def _path_exists(grid_map: GridMap, start: Point, goal: Point) -> bool:
+    queue = [start]
+    visited = {start}
+
+    while queue:
+        current = queue.pop(0)
+        if current == goal:
+            return True
+
+        for neighbor in grid_map.neighbors(current):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                queue.append(neighbor)
+
+    return False
+
+
+def build_demo_layout(
+    rows: int = 30,
+    cols: int = 40,
+    density: float = 0.3,
+    attempts: int = 80,
+) -> tuple[list[list[int]], Point, Point]:
+    for _attempt in range(attempts):
+        grid = [
+            [0 if random.random() < density else 1 for _col in range(cols)]
+            for _row in range(rows)
+        ]
+        start = Point(random.randrange(rows), 0)
+        goal = Point(random.randrange(rows), cols - 1)
+        grid[start.row][start.col] = 1
+        grid[goal.row][goal.col] = 1
+
+        grid_map = GridMap(grid)
+        if _path_exists(grid_map, start, goal):
+            return grid, start, goal
+
+    fallback_grid = [[1 for _col in range(cols)] for _row in range(rows)]
+    fallback_start = Point(rows // 4, 0)
+    fallback_goal = Point((rows * 3) // 4, cols - 1)
+    return fallback_grid, fallback_start, fallback_goal
 
 
 def run_cli_demo() -> None:
@@ -59,9 +93,8 @@ def format_results_table(results: list[dict[str, object]]) -> str:
 
 
 def run_cli_demo_with_algorithms(algorithms: str | list[str]) -> None:
-    grid_map = GridMap(build_demo_grid())
-    start = Point(0, 0)
-    goal = Point(4, 6)
+    grid, start, goal = build_demo_layout()
+    grid_map = GridMap(grid)
 
     results = run_algorithms(algorithms, grid_map, start, goal)
     path = results[0].path if results else find_path(grid_map, start, goal)
@@ -124,7 +157,8 @@ def main() -> None:
         run_cli_demo_with_algorithms(selected_algorithms)
         return
 
-    output_path = launch_demo_ui(build_demo_grid(), Point(0, 0), Point(4, 6))
+    demo_grid, start, goal = build_demo_layout()
+    output_path = launch_demo_ui(demo_grid, start, goal)
     print(f"UI generated at: {output_path}")
     print("Open that HTML file in your browser to view the demo.")
 
