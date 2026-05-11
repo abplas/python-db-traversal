@@ -14,6 +14,7 @@ def point_to_dict(point: Point) -> dict[str, int]:
 class PathfindingResult:
     algorithm_name: str
     path: list[Point]
+    cumulative_costs: list[float]
     path_found: bool
     path_cost: float | None
     path_length_nodes: int
@@ -28,6 +29,7 @@ class PathfindingResult:
         return {
             "algorithm_name": self.algorithm_name,
             "path": [point_to_dict(point) for point in self.path],
+            "cumulative_costs": self.cumulative_costs,
             "path_found": self.path_found,
             "path_cost": self.path_cost,
             "path_length_nodes": self.path_length_nodes,
