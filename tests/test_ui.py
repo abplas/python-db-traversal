@@ -21,14 +21,23 @@ class UiTests(unittest.TestCase):
         )
 
         self.assertIn("/run-pathfinding", html)
+        self.assertIn("bfs", html)
         self.assertIn("astar", html)
         self.assertIn("dijkstra", html)
+        self.assertIn("greedy_best_first", html)
+        self.assertIn("weighted_astar", html)
         self.assertIn("Algorithm comparison", html)
         self.assertIn("Runtime ms", html)
+        self.assertIn("Stoplights Crossed", html)
+        self.assertIn("Traffic Cost", html)
+        self.assertIn("Reliability / Tradeoff", html)
         self.assertIn('max="30"', html)
         self.assertIn('max="40"', html)
         self.assertIn("Directional traffic", html)
-        self.assertIn("Time Complexity", html)
+        self.assertIn("Stoplight edit", html)
+        self.assertIn("Randomize stoplights", html)
+        self.assertIn("Stoplight Density", html)
+        self.assertIn("Stoplights:", html)
 
 
 if __name__ == "__main__":

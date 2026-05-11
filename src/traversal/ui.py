@@ -8,6 +8,7 @@ from traversal.grid import Point
 
 BLOCKED_COLOR = "#d9dde3"
 TRAFFIC_COLOR = "#fde68a"
+STOPLIGHT_COLOR = "#fb7185"
 PATH_COLOR = "#d97706"
 START_COLOR = "#16a34a"
 GOAL_COLOR = "#dc2626"
@@ -50,9 +51,13 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       --line: {GRID_LINE_COLOR};
       --blocked: {BLOCKED_COLOR};
       --traffic: {TRAFFIC_COLOR};
+      --stoplight: {STOPLIGHT_COLOR};
       --path: {PATH_COLOR};
+      --route-bfs: #2563eb;
       --route-astar: #d97706;
       --route-dijkstra: #0f766e;
+      --route-greedy: #db2777;
+      --route-weighted-astar: #7c3aed;
       --route-shared: #7c3aed;
       --start: {START_COLOR};
       --goal: {GOAL_COLOR};
@@ -379,6 +384,7 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
         <div class="chip" id="goal-chip">B: (0, 0)</div>
         <div class="chip" id="moves-chip">Moves: 0</div>
         <div class="chip" id="traffic-chip">Traffic: Off</div>
+        <div class="chip" id="stoplight-chip">Stoplights: 0</div>
       </div>
     </section>
 
@@ -390,10 +396,14 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       <div class="legend-item"><span class="swatch" style="background:{START_COLOR};"></span>Point A</div>
       <div class="legend-item"><span class="swatch" style="background:{GOAL_COLOR};"></span>Point B</div>
       <div class="legend-item"><span class="swatch" style="background:{PATH_COLOR};"></span>Route</div>
+      <div class="legend-item"><span class="swatch" style="background:var(--route-bfs);"></span>BFS route</div>
       <div class="legend-item"><span class="swatch" style="background:var(--route-astar);"></span>A* route</div>
       <div class="legend-item"><span class="swatch" style="background:var(--route-dijkstra);"></span>Dijkstra route</div>
+      <div class="legend-item"><span class="swatch" style="background:var(--route-greedy);"></span>Greedy route</div>
+      <div class="legend-item"><span class="swatch" style="background:var(--route-weighted-astar);"></span>Weighted A* route</div>
       <div class="legend-item"><span class="swatch" style="background:var(--route-shared);"></span>Shared segment</div>
       <div class="legend-item"><span class="swatch" style="background:{TRAFFIC_COLOR};"></span>Directional traffic</div>
+      <div class="legend-item"><span class="swatch" style="background:{STOPLIGHT_COLOR};"></span>Stoplight delay</div>
       <div class="legend-item"><span class="swatch" style="background:{BLOCKED_COLOR};"></span>Blocked</div>
     </section>
 
@@ -416,6 +426,11 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
           <label for="cols">Columns: <output id="cols-value">40</output></label>
           <input id="cols" type="range" min="4" max="40" value="40" />
         </div>
+
+        <div class="field">
+          <label for="stoplight-density">Stoplight Density: <output id="stoplight-density-value">22%</output></label>
+          <input id="stoplight-density" type="range" min="0" max="60" value="22" />
+        </div>
       </div>
 
       <div class="stack">
@@ -423,12 +438,24 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
           <label>Algorithms</label>
           <div class="algorithm-options">
             <label class="checkbox-chip">
+              <input type="checkbox" id="algorithm-bfs" name="algorithm" value="bfs" />
+              <span>BFS</span>
+            </label>
+            <label class="checkbox-chip">
               <input type="checkbox" id="algorithm-astar" name="algorithm" value="astar" checked />
               <span>A*</span>
             </label>
             <label class="checkbox-chip">
               <input type="checkbox" id="algorithm-dijkstra" name="algorithm" value="dijkstra" />
               <span>Dijkstra</span>
+            </label>
+            <label class="checkbox-chip">
+              <input type="checkbox" id="algorithm-greedy-best-first" name="algorithm" value="greedy_best_first" />
+              <span>Greedy Best-First</span>
+            </label>
+            <label class="checkbox-chip">
+              <input type="checkbox" id="algorithm-weighted-astar" name="algorithm" value="weighted_astar" />
+              <span>Weighted A*</span>
             </label>
             <label class="checkbox-chip">
               <input type="checkbox" id="algorithm-all" name="algorithm-all" value="all" />
@@ -448,6 +475,8 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
         <button id="generate-grid">Generate new grid</button>
         <button id="toggle-traffic">Directional traffic: Off</button>
         <button id="randomize-traffic">Randomize traffic flow</button>
+        <button id="randomize-stoplights">Randomize stoplights</button>
+        <button id="toggle-stoplight-mode">Stoplight edit: Off</button>
         <button id="toggle-block-mode">Roadblock edit: Off</button>
         <button id="clear-blocks">Clear roadblocks</button>
       </div>
@@ -455,6 +484,7 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       <div class="hint">
         Click A or B once to select it, then click a new grid intersection to move it and recalculate the route.
         Turn on roadblock edit if you want to click cell squares to add or remove blockers.
+        Turn on stoplight edit if you want to click intersections and add a default 15-second delay.
       </div>
       <div class="status" id="status-text">Ready.</div>
       <div class="status info" id="api-status-text">Backend status: waiting to run.</div>
@@ -463,22 +493,23 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
     <section class="panel comparison-panel">
       <h2>Algorithm comparison</h2>
       <div class="comparison-empty" id="comparison-empty">
-        Run the backend comparison to see A*, Dijkstra, or all registered algorithms side by side.
+        Run the backend comparison to see BFS, A*, Dijkstra, Greedy Best-First, Weighted A*, or all registered algorithms side by side.
       </div>
       <table id="comparison-table" hidden>
         <thead>
           <tr>
             <th>Algorithm</th>
+            <th>Category</th>
             <th>Path Found</th>
             <th>Moves</th>
+            <th>Total Cost</th>
             <th>Runtime ms</th>
             <th>Visited</th>
             <th>Expanded</th>
-            <th>Frontier Pushes</th>
-            <th>Path Cost</th>
-            <th>Nodes</th>
-            <th>Edges</th>
-            <th>Time Complexity</th>
+            <th>Stoplights Crossed</th>
+            <th>Stoplight Delay</th>
+            <th>Traffic Cost</th>
+            <th>Reliability / Tradeoff</th>
           </tr>
         </thead>
         <tbody id="comparison-body"></tbody>
@@ -502,15 +533,18 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       results: [],
       trafficEnabled: false,
       traffic: null,
+      stoplights: {{}},
     }};
 
     const svg = document.getElementById("grid-svg");
     const densityInput = document.getElementById("density");
     const rowsInput = document.getElementById("rows");
     const colsInput = document.getElementById("cols");
+    const stoplightDensityInput = document.getElementById("stoplight-density");
     const densityValue = document.getElementById("density-value");
     const rowsValue = document.getElementById("rows-value");
     const colsValue = document.getElementById("cols-value");
+    const stoplightDensityValue = document.getElementById("stoplight-density-value");
     const routeText = document.getElementById("route-text");
     const statusText = document.getElementById("status-text");
     const apiStatusText = document.getElementById("api-status-text");
@@ -518,28 +552,49 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
     const goalChip = document.getElementById("goal-chip");
     const movesChip = document.getElementById("moves-chip");
     const trafficChip = document.getElementById("traffic-chip");
+    const stoplightChip = document.getElementById("stoplight-chip");
     const blockModeButton = document.getElementById("toggle-block-mode");
     const trafficButton = document.getElementById("toggle-traffic");
+    const stoplightModeButton = document.getElementById("toggle-stoplight-mode");
     const comparisonTable = document.getElementById("comparison-table");
     const comparisonBody = document.getElementById("comparison-body");
     const comparisonEmpty = document.getElementById("comparison-empty");
     const runAllCheckbox = document.getElementById("algorithm-all");
     const individualAlgorithmCheckboxes = [
+      document.getElementById("algorithm-bfs"),
       document.getElementById("algorithm-astar"),
       document.getElementById("algorithm-dijkstra"),
+      document.getElementById("algorithm-greedy-best-first"),
+      document.getElementById("algorithm-weighted-astar"),
     ];
 
     let activeMarker = null;
     let blockMode = false;
+    let stoplightMode = false;
+    const DEFAULT_STOPLIGHT_DELAY = 15;
+    const DEFAULT_STOPLIGHT_CYCLE = 60;
 
     rowsInput.value = state.grid.length;
     colsInput.value = state.grid[0].length;
     rowsValue.textContent = rowsInput.value;
     colsValue.textContent = colsInput.value;
     densityValue.textContent = densityInput.value + "%";
+    stoplightDensityValue.textContent = stoplightDensityInput.value + "%";
 
     function pointKey(point) {{
       return `${{point.row}},${{point.col}}`;
+    }}
+
+    function serializeStoplights() {{
+      return Object.values(state.stoplights);
+    }}
+
+    function stoplightDelay(point) {{
+      const stoplight = state.stoplights[pointKey(point)];
+      if (!stoplight || stoplight.has_stoplight === false) {{
+        return 0;
+      }}
+      return Number(stoplight.average_wait_seconds ?? 0);
     }}
 
     function inBounds(point) {{
@@ -575,7 +630,7 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       apiStatusText.classList.add(tone);
     }}
 
-    function clearComparisonResults(message = "Run the backend comparison to see A*, Dijkstra, or all registered algorithms side by side.") {{
+    function clearComparisonResults(message = "Run the backend comparison to see BFS, A*, Dijkstra, Greedy Best-First, Weighted A*, or all registered algorithms side by side.") {{
       state.results = [];
       comparisonBody.innerHTML = "";
       comparisonTable.hidden = true;
@@ -588,19 +643,27 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       comparisonBody.innerHTML = "";
 
       for (const result of results) {{
+        const detailParts = [];
+        if (result.comparison_label) {{
+          detailParts.push(result.comparison_label);
+        }}
+        if (result.metadata?.tradeoff) {{
+          detailParts.push(result.metadata.tradeoff);
+        }}
         const row = document.createElement("tr");
         row.innerHTML = `
-          <td>${{result.algorithm_name}}</td>
+          <td>${{result.metadata?.display_name ?? result.algorithm_name}}</td>
+          <td>${{formatLabel(result.metadata?.reliability_category)}}</td>
           <td>${{result.path_found ? "Yes" : "No"}}</td>
           <td>${{result.moves}}</td>
+          <td>${{formatCost(result.path_cost)}}</td>
           <td>${{result.runtime_ms}}</td>
           <td>${{result.visited_count}}</td>
           <td>${{result.expanded_count}}</td>
-          <td>${{result.frontier_pushes}}</td>
-          <td>${{formatCost(result.path_cost)}}</td>
-          <td>${{result.metadata?.node_count ?? "N/A"}}</td>
-          <td>${{result.metadata?.edge_count ?? "N/A"}}</td>
-          <td>${{result.metadata?.time_complexity ?? "N/A"}}</td>
+          <td>${{result.metadata?.stoplights_crossed ?? 0}}</td>
+          <td>${{formatCost(result.metadata?.stoplight_delay_total)}}</td>
+          <td>${{formatCost(result.metadata?.traffic_cost_total)}}</td>
+          <td>${{detailParts.map(formatLabel).join(" | ") || "N/A"}}</td>
         `;
         comparisonBody.appendChild(row);
       }}
@@ -637,14 +700,18 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
 
     function getRouteColor(algorithmName, index) {{
       const normalized = String(algorithmName).toLowerCase();
+      if (normalized === "bfs") return "var(--route-bfs)";
       if (normalized === "astar") return "var(--route-astar)";
       if (normalized === "dijkstra") return "var(--route-dijkstra)";
+      if (normalized === "greedy_best_first") return "var(--route-greedy)";
+      if (normalized === "weighted_astar") return "var(--route-weighted-astar)";
 
       const fallbackColors = [
+        "var(--route-bfs)",
         "var(--route-astar)",
         "var(--route-dijkstra)",
-        "#2563eb",
-        "#db2777",
+        "var(--route-greedy)",
+        "var(--route-weighted-astar)",
       ];
       return fallbackColors[index % fallbackColors.length];
     }}
@@ -744,6 +811,13 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       return value === null || value === undefined ? "N/A" : Number(value).toFixed(2).replace(/[.]00$/, "");
     }}
 
+    function formatLabel(value) {{
+      if (value === null || value === undefined || value === "") {{
+        return "N/A";
+      }}
+      return String(value).replace(/_/g, " ");
+    }}
+
     function createNeutralTraffic(rows, cols) {{
       const directions = ["north", "south", "east", "west"];
       return Object.fromEntries(
@@ -788,11 +862,14 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
     }}
 
     function movementCost(current, neighbor) {{
-      if (!state.trafficEnabled) {{
-        return 1;
-      }}
-      ensureTraffic();
-      return state.traffic[directionBetween(current, neighbor)][current.row][current.col];
+      const trafficCost = (() => {{
+        if (!state.trafficEnabled) {{
+          return 1;
+        }}
+        ensureTraffic();
+        return state.traffic[directionBetween(current, neighbor)][current.row][current.col];
+      }})();
+      return trafficCost + stoplightDelay(neighbor);
     }}
 
     function getSelectedAlgorithms() {{
@@ -864,11 +941,67 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       return path.reverse();
     }}
 
+    function isFourWayIntersection(point) {{
+      return isRoad(point) && neighbors(point).length === 4;
+    }}
+
+    function findFourWayIntersections() {{
+      const intersections = [];
+      for (let row = 0; row < state.grid.length; row += 1) {{
+        for (let col = 0; col < state.grid[0].length; col += 1) {{
+          const point = {{ row, col }};
+          if (isFourWayIntersection(point)) {{
+            intersections.push(point);
+          }}
+        }}
+      }}
+      return intersections;
+    }}
+
+    function generateRandomStoplights() {{
+      const density = Number(stoplightDensityInput.value) / 100;
+      const intersections = findFourWayIntersections().filter(point => {{
+        return !(
+          (point.row === state.start.row && point.col === state.start.col) ||
+          (point.row === state.goal.row && point.col === state.goal.col)
+        );
+      }});
+
+      state.stoplights = {{}};
+      for (const point of intersections) {{
+        if (Math.random() > density) {{
+          continue;
+        }}
+        state.stoplights[pointKey(point)] = {{
+          row: point.row,
+          col: point.col,
+          average_wait_seconds: [8, 12, 15, 20][Math.floor(Math.random() * 4)],
+          light_cycle_seconds: [45, 60, 75][Math.floor(Math.random() * 3)],
+          has_stoplight: true,
+          metadata: {{}},
+        }};
+      }}
+    }}
+
+    function buildStreetGrid(rows, cols, density) {{
+      const rowGapOptions = [3, 4, 5];
+      const colGapOptions = [3, 4, 5];
+      const rowGap = rowGapOptions[Math.floor(Math.random() * rowGapOptions.length)];
+      const colGap = colGapOptions[Math.floor(Math.random() * colGapOptions.length)];
+      const majorRows = new Set(Array.from({{ length: Math.ceil(rows / rowGap) }}, (_, index) => index * rowGap));
+      const majorCols = new Set(Array.from({{ length: Math.ceil(cols / colGap) }}, (_, index) => index * colGap));
+      return Array.from({{ length: rows }}, (_, row) =>
+        Array.from({{ length: cols }}, (_, col) => {{
+          const onMajorCorridor = majorRows.has(row) || majorCols.has(col) || col === 0 || col === cols - 1;
+          const blockProbability = Math.min(onMajorCorridor ? density * 0.15 : density * 1.25, 0.82);
+          return Math.random() < blockProbability ? 0 : 1;
+        }})
+      );
+    }}
+
     function generateRandomGrid(rows, cols, density, attempts = 40) {{
       for (let attempt = 0; attempt < attempts; attempt += 1) {{
-        const grid = Array.from({{ length: rows }}, () =>
-          Array.from({{ length: cols }}, () => (Math.random() < density ? 0 : 1))
-        );
+        const grid = buildStreetGrid(rows, cols, density);
 
         const start = {{ row: Math.floor(Math.random() * rows), col: 0 }};
         const goal = {{ row: Math.floor(Math.random() * rows), col: cols - 1 }};
@@ -881,8 +1014,10 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
         state.path = [];
         state.pathCost = 0;
         state.traffic = state.trafficEnabled ? createDirectionalTraffic(rows, cols) : null;
+        state.stoplights = {{}};
 
         if (pathExists()) {{
+          generateRandomStoplights();
           return true;
         }}
       }}
@@ -913,6 +1048,11 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
     }}
 
     function setIntersection(row, col) {{
+      if (stoplightMode) {{
+        toggleStoplight(row, col);
+        return;
+      }}
+
       if (!activeMarker) {{
         updateStatus("Click A or B first, then click a new grid intersection.");
         return;
@@ -928,6 +1068,8 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
         state.goal = point;
         updateStatus(`Point B moved to (${{row}}, ${{col}}).`);
       }}
+
+      delete state.stoplights[pointKey(point)];
 
       activeMarker = null;
       syncStatusAppearance();
@@ -948,7 +1090,48 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       }}
 
       state.grid[row][col] = state.grid[row][col] === 1 ? 0 : 1;
+      if (state.grid[row][col] === 0) {{
+        delete state.stoplights[pointKey({{ row, col }})];
+      }}
       clearComparisonResults("Grid changed. Run the backend comparison again to refresh the table.");
+      findPathInBrowser();
+    }}
+
+    function toggleStoplight(row, col) {{
+      const point = {{ row, col }};
+      const key = pointKey(point);
+
+      if (!isRoad(point)) {{
+        updateStatus("Stoplights must be placed on traversable intersections.");
+        return;
+      }}
+
+      if (!isFourWayIntersection(point)) {{
+        updateStatus("Stoplights should only be placed on four-way intersections.");
+        return;
+      }}
+
+      if ((state.start.row === row && state.start.col === col) || (state.goal.row === row && state.goal.col === col)) {{
+        updateStatus("Start and goal points cannot also be stoplights.");
+        return;
+      }}
+
+      if (state.stoplights[key]) {{
+        delete state.stoplights[key];
+        updateStatus(`Removed stoplight at (${{row}}, ${{col}}).`);
+      }} else {{
+        state.stoplights[key] = {{
+          row,
+          col,
+          average_wait_seconds: DEFAULT_STOPLIGHT_DELAY,
+          light_cycle_seconds: DEFAULT_STOPLIGHT_CYCLE,
+          has_stoplight: true,
+          metadata: {{}},
+        }};
+        updateStatus(`Added a ${{DEFAULT_STOPLIGHT_DELAY}}-second stoplight delay at (${{row}}, ${{col}}).`);
+      }}
+
+      clearComparisonResults("Stoplights changed. Run the backend comparison again to refresh the table.");
       findPathInBrowser();
     }}
 
@@ -967,7 +1150,9 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
     function selectMarker(markerName) {{
       activeMarker = markerName;
       blockMode = false;
+      stoplightMode = false;
       blockModeButton.textContent = "Roadblock edit: Off";
+      stoplightModeButton.textContent = "Stoplight edit: Off";
       const label = markerName === "start" ? "A" : "B";
       updateStatus(`Point ${{label}} selected. Click a new grid intersection to move it.`);
       syncStatusAppearance();
@@ -1005,6 +1190,7 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
             goal: state.goal,
             algorithms: selectedAlgorithms,
             traffic: state.trafficEnabled ? state.traffic : null,
+            stoplights: serializeStoplights(),
           }}),
         }});
 
@@ -1023,7 +1209,7 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
           state.pathCost = firstSuccessfulResult.path_cost ?? 0;
           const successfulAlgorithms = payload.results
             .filter(result => result.path_found)
-            .map(result => result.algorithm_name)
+            .map(result => result.metadata?.display_name ?? result.algorithm_name)
             .join(", ");
           updateStatus(`Showing backend routes for: ${{successfulAlgorithms}}.`);
         }} else {{
@@ -1088,6 +1274,20 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
             svg.appendChild(marker);
           }}
         }}
+      }}
+
+      for (const stoplight of serializeStoplights()) {{
+        const x = MARGIN + stoplight.col * CELL_SIZE;
+        const y = MARGIN + stoplight.row * CELL_SIZE;
+        const marker = document.createElementNS(SVG_NS, "circle");
+        marker.setAttribute("cx", String(x));
+        marker.setAttribute("cy", String(y));
+        marker.setAttribute("r", "10");
+        marker.setAttribute("fill", "var(--stoplight)");
+        marker.setAttribute("opacity", "0.9");
+        marker.setAttribute("stroke", "#ffffff");
+        marker.setAttribute("stroke-width", "2");
+        svg.appendChild(marker);
       }}
 
       for (let row = 0; row < rows; row += 1) {{
@@ -1191,10 +1391,11 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       goalChip.textContent = `B: (${{state.goal.row}}, ${{state.goal.col}})`;
       movesChip.textContent = `Moves: ${{Math.max(state.path.length - 1, 0)}}`;
       trafficChip.textContent = `Traffic: ${{state.trafficEnabled ? "On" : "Off"}}`;
+      stoplightChip.textContent = `Stoplights: ${{serializeStoplights().length}}`;
       const displayedRoutes = getDisplayedRoutes();
       routeText.textContent = displayedRoutes.length > 0
         ? displayedRoutes
-            .map(route => `${{route.algorithm}}: ${{route.path.map(point => `(${{point.row}}, ${{point.col}})`).join(" -> ")}} | cost ${{formatCost(route.cost)}}`)
+            .map(route => `${{formatLabel(route.algorithm)}}: ${{route.path.map(point => `(${{point.row}}, ${{point.col}})`).join(" -> ")}} | cost ${{formatCost(route.cost)}}`)
             .join(" || ")
         : "No route found for the current layout.";
     }}
@@ -1243,6 +1444,10 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       colsValue.textContent = colsInput.value;
     }});
 
+    stoplightDensityInput.addEventListener("input", () => {{
+      stoplightDensityValue.textContent = stoplightDensityInput.value + "%";
+    }});
+
     runAllCheckbox.addEventListener("change", () => {{
       if (runAllCheckbox.checked) {{
         individualAlgorithmCheckboxes.forEach(checkbox => {{
@@ -1284,6 +1489,8 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       if (state.trafficEnabled) {{
         ensureTraffic();
       }}
+      stoplightMode = false;
+      stoplightModeButton.textContent = "Stoplight edit: Off";
       trafficButton.textContent = `Directional traffic: ${{state.trafficEnabled ? "On" : "Off"}}`;
       clearComparisonResults("Traffic flow changed. Run the backend comparison again to refresh the table.");
       findPathInBrowser();
@@ -1298,9 +1505,33 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       findPathInBrowser();
     }});
 
+    document.getElementById("randomize-stoplights").addEventListener("click", () => {{
+      generateRandomStoplights();
+      updateStatus("Generated stoplights on available four-way intersections.");
+      clearComparisonResults("Stoplights changed. Run the backend comparison again to refresh the table.");
+      findPathInBrowser();
+    }});
+
+    stoplightModeButton.addEventListener("click", () => {{
+      stoplightMode = !stoplightMode;
+      blockMode = false;
+      activeMarker = null;
+      blockModeButton.textContent = "Roadblock edit: Off";
+      stoplightModeButton.textContent = `Stoplight edit: ${{stoplightMode ? "On" : "Off"}}`;
+      updateStatus(
+        stoplightMode
+          ? "Stoplight edit is on. Click an intersection to add or remove a default 15-second delay."
+          : "Stoplight edit is off."
+      );
+      syncStatusAppearance();
+      render();
+    }});
+
     blockModeButton.addEventListener("click", () => {{
       blockMode = !blockMode;
+      stoplightMode = false;
       activeMarker = null;
+      stoplightModeButton.textContent = "Stoplight edit: Off";
       blockModeButton.textContent = `Roadblock edit: ${{blockMode ? "On" : "Off"}}`;
       updateStatus(
         blockMode

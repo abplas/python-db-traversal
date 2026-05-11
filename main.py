@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from traversal import (
     GridMap,
     Point,
+    Stoplight,
     find_path,
     list_algorithms,
     run_algorithms,
@@ -32,6 +33,47 @@ def _path_exists(grid_map: GridMap, start: Point, goal: Point) -> bool:
     return False
 
 
+def build_street_grid(rows: int, cols: int, density: float) -> list[list[int]]:
+    major_row_gap = random.choice((3, 4, 5))
+    major_col_gap = random.choice((3, 4, 5))
+    major_rows = set(range(0, rows, major_row_gap))
+    major_cols = set(range(0, cols, major_col_gap))
+    grid: list[list[int]] = []
+
+    for row in range(rows):
+        grid_row: list[int] = []
+        for col in range(cols):
+            on_major_corridor = row in major_rows or col in major_cols or col in {0, cols - 1}
+            block_probability = density * (0.15 if on_major_corridor else 1.25)
+            grid_row.append(0 if random.random() < min(block_probability, 0.82) else 1)
+        grid.append(grid_row)
+
+    return grid
+
+
+def generate_random_stoplights(
+    grid_map: GridMap,
+    *,
+    start: Point,
+    goal: Point,
+    density: float = 0.22,
+) -> list[Stoplight]:
+    intersections = grid_map.find_four_way_intersections(exclude={start, goal})
+    stoplights: list[Stoplight] = []
+    for point in intersections:
+        if random.random() > density:
+            continue
+        stoplights.append(
+            Stoplight(
+                row=point.row,
+                col=point.col,
+                average_wait_seconds=random.choice((8.0, 12.0, 15.0, 20.0)),
+                light_cycle_seconds=random.choice((45.0, 60.0, 75.0)),
+            )
+        )
+    return stoplights
+
+
 def build_demo_layout(
     rows: int = 30,
     cols: int = 40,
@@ -39,10 +81,7 @@ def build_demo_layout(
     attempts: int = 80,
 ) -> tuple[list[list[int]], Point, Point]:
     for _attempt in range(attempts):
-        grid = [
-            [0 if random.random() < density else 1 for _col in range(cols)]
-            for _row in range(rows)
-        ]
+        grid = build_street_grid(rows, cols, density)
         start = Point(random.randrange(rows), 0)
         goal = Point(random.randrange(rows), cols - 1)
         grid[start.row][start.col] = 1
@@ -65,8 +104,10 @@ def run_cli_demo() -> None:
 def format_results_table(results: list[dict[str, object]]) -> str:
     headers = [
         "algorithm",
+        "category",
         "path_found",
         "moves",
+        "path_cost",
         "runtime_ms",
         "visited_count",
         "expanded_count",
@@ -109,8 +150,10 @@ def run_cli_demo_with_algorithms(algorithms: str | list[str]) -> None:
             [
                 {
                     "algorithm": result.algorithm_name,
+                    "category": str(result.metadata.get("reliability_category", "n/a")),
                     "path_found": result.path_found,
                     "moves": result.moves,
+                    "path_cost": result.path_cost,
                     "runtime_ms": result.runtime_ms,
                     "visited_count": result.visited_count,
                     "expanded_count": result.expanded_count,

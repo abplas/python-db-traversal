@@ -25,6 +25,25 @@ two points using Manhattan-distance pathfinding.
 This makes the project a good fit for city-block style traversal where roads
 behave like a rectangular grid.
 
+## Setup
+
+This project requires Python `3.10+`.
+
+If you are using VS Code:
+
+- open the project folder
+- select a Python `3.10+` interpreter
+- use the VS Code terminal in this project directory
+
+Install the project and test dependencies with:
+
+```bash
+python3 -m pip install -e '.[test]'
+```
+
+The quotes matter in `zsh`, where `.[test]` can otherwise be treated as a
+filename pattern.
+
 ## Project structure
 
 - `src/traversal/grid.py`: grid and node modeling
@@ -39,6 +58,12 @@ python3 main.py
 ```
 
 This generates a simple HTML page at `demo_output/traversal_demo.html`.
+On macOS, you can open it with:
+
+```bash
+open demo_output/traversal_demo.html
+```
+
 Open that file in your browser to show:
 
 - point A
