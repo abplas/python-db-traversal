@@ -14,6 +14,9 @@
       --blocked: #d9dde3;
       --traffic: #fde68a;
       --path: #d97706;
+      --route-astar: #d97706;
+      --route-dijkstra: #0f766e;
+      --route-shared: #7c3aed;
       --start: #16a34a;
       --goal: #dc2626;
     }
@@ -350,6 +353,9 @@
       <div class="legend-item"><span class="swatch" style="background:#16a34a;"></span>Point A</div>
       <div class="legend-item"><span class="swatch" style="background:#dc2626;"></span>Point B</div>
       <div class="legend-item"><span class="swatch" style="background:#d97706;"></span>Route</div>
+      <div class="legend-item"><span class="swatch" style="background:var(--route-astar);"></span>A* route</div>
+      <div class="legend-item"><span class="swatch" style="background:var(--route-dijkstra);"></span>Dijkstra route</div>
+      <div class="legend-item"><span class="swatch" style="background:var(--route-shared);"></span>Shared segment</div>
       <div class="legend-item"><span class="swatch" style="background:#fde68a;"></span>Directional traffic</div>
       <div class="legend-item"><span class="swatch" style="background:#d9dde3;"></span>Blocked</div>
     </section>
@@ -365,13 +371,13 @@
         </div>
 
         <div class="field">
-          <label for="rows">Rows: <output id="rows-value">5</output></label>
-          <input id="rows" type="range" min="4" max="30" value="5" />
+          <label for="rows">Rows: <output id="rows-value">30</output></label>
+          <input id="rows" type="range" min="4" max="30" value="30" />
         </div>
 
         <div class="field">
-          <label for="cols">Columns: <output id="cols-value">7</output></label>
-          <input id="cols" type="range" min="4" max="40" value="7" />
+          <label for="cols">Columns: <output id="cols-value">40</output></label>
+          <input id="cols" type="range" min="4" max="40" value="40" />
         </div>
       </div>
 
@@ -444,7 +450,7 @@
   </main>
 
   <script>
-    const INITIAL_STATE = {"grid": [[1, 1, 1, 1, 1, 0, 1], [0, 0, 1, 0, 1, 0, 1], [1, 1, 1, 0, 1, 1, 1], [1, 0, 0, 0, 1, 0, 0], [1, 1, 1, 1, 1, 1, 1]], "start": {"row": 0, "col": 0}, "goal": {"row": 4, "col": 6}};
+    const INITIAL_STATE = {"grid": [[1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1], [0, 0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1], [1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0], [0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0], [1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1], [0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1], [1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1], [1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1], [1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1], [1, 0, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1], [1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1], [1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1], [1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1], [0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0], [0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0], [1, 1, 1, 0, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1], [0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1], [0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0], [1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0], [1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1], [1, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1], [1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0], [0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1], [1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1], [1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0], [0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1], [1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1]], "start": {"row": 16, "col": 0}, "goal": {"row": 21, "col": 39}};
     const API_URL = "http://127.0.0.1:8000/run-pathfinding";
     const CELL_SIZE = 48;
     const MARGIN = 56;
@@ -564,6 +570,137 @@
 
       comparisonEmpty.hidden = true;
       comparisonTable.hidden = false;
+    }
+
+    function getDisplayedRoutes() {
+      const backendRoutes = state.results
+        .filter(result => result.path_found && Array.isArray(result.path) && result.path.length > 0)
+        .map((result, index) => ({
+          algorithm: result.algorithm_name,
+          path: result.path,
+          cost: result.path_cost ?? 0,
+          index,
+        }));
+
+      if (backendRoutes.length > 0) {
+        return backendRoutes;
+      }
+
+      if (state.path.length > 0) {
+        return [{
+          algorithm: "browser",
+          path: state.path,
+          cost: state.pathCost,
+          index: 0,
+        }];
+      }
+
+      return [];
+    }
+
+    function getRouteColor(algorithmName, index) {
+      const normalized = String(algorithmName).toLowerCase();
+      if (normalized === "astar") return "var(--route-astar)";
+      if (normalized === "dijkstra") return "var(--route-dijkstra)";
+
+      const fallbackColors = [
+        "var(--route-astar)",
+        "var(--route-dijkstra)",
+        "#2563eb",
+        "#db2777",
+      ];
+      return fallbackColors[index % fallbackColors.length];
+    }
+
+    function segmentKey(a, b) {
+      const first = pointKey(a);
+      const second = pointKey(b);
+      return first < second ? `${first}|${second}` : `${second}|${first}`;
+    }
+
+    function renderRoutes(svg, routes) {
+      if (routes.length === 0) {
+        return;
+      }
+
+      const segmentUsage = new Map();
+      for (const route of routes) {
+        for (let index = 0; index < route.path.length - 1; index += 1) {
+          const start = route.path[index];
+          const end = route.path[index + 1];
+          const key = segmentKey(start, end);
+          const segments = segmentUsage.get(key) ?? [];
+          segments.push(route);
+          segmentUsage.set(key, segments);
+        }
+      }
+
+      for (const route of routes) {
+        const stroke = getRouteColor(route.algorithm, route.index);
+
+        for (let index = 0; index < route.path.length - 1; index += 1) {
+          const start = route.path[index];
+          const end = route.path[index + 1];
+          const key = segmentKey(start, end);
+          const sharedRoutes = segmentUsage.get(key) ?? [route];
+          const sharedIndex = sharedRoutes.findIndex(candidate => candidate.algorithm === route.algorithm);
+          const overlapCount = sharedRoutes.length;
+          const x1 = MARGIN + start.col * CELL_SIZE;
+          const y1 = MARGIN + start.row * CELL_SIZE;
+          const x2 = MARGIN + end.col * CELL_SIZE;
+          const y2 = MARGIN + end.row * CELL_SIZE;
+          let offsetX = 0;
+          let offsetY = 0;
+
+          if (overlapCount > 1) {
+            const spacing = 4.5;
+            const centeredOffset = (sharedIndex - (overlapCount - 1) / 2) * spacing;
+            if (start.row === end.row) {
+              offsetY = centeredOffset;
+            } else {
+              offsetX = centeredOffset;
+            }
+
+            const sharedBase = document.createElementNS(SVG_NS, "line");
+            sharedBase.setAttribute("x1", String(x1));
+            sharedBase.setAttribute("y1", String(y1));
+            sharedBase.setAttribute("x2", String(x2));
+            sharedBase.setAttribute("y2", String(y2));
+            sharedBase.setAttribute("stroke", "var(--route-shared)");
+            sharedBase.setAttribute("stroke-width", "10");
+            sharedBase.setAttribute("stroke-linecap", "round");
+            sharedBase.setAttribute("opacity", "0.2");
+            svg.appendChild(sharedBase);
+          }
+
+          const line = document.createElementNS(SVG_NS, "line");
+          line.setAttribute("x1", String(x1 + offsetX));
+          line.setAttribute("y1", String(y1 + offsetY));
+          line.setAttribute("x2", String(x2 + offsetX));
+          line.setAttribute("y2", String(y2 + offsetY));
+          line.setAttribute("stroke", stroke);
+          line.setAttribute("stroke-width", overlapCount > 1 ? "4" : "7");
+          line.setAttribute("stroke-linecap", "round");
+          line.setAttribute("opacity", overlapCount > 1 ? "0.95" : "0.9");
+          svg.appendChild(line);
+        }
+
+        for (const point of route.path) {
+          const key = pointKey(point);
+          const sharedPointCount = routes.filter(candidate =>
+            candidate.path.some(candidatePoint => pointKey(candidatePoint) === key)
+          ).length;
+
+          const node = document.createElementNS(SVG_NS, "circle");
+          node.setAttribute("cx", String(MARGIN + point.col * CELL_SIZE));
+          node.setAttribute("cy", String(MARGIN + point.row * CELL_SIZE));
+          node.setAttribute("r", sharedPointCount > 1 ? "6.5" : "7.5");
+          node.setAttribute("fill", sharedPointCount > 1 ? "var(--route-shared)" : stroke);
+          node.setAttribute("stroke", "#ffffff");
+          node.setAttribute("stroke-width", sharedPointCount > 1 ? "2.5" : "2");
+          svg.appendChild(node);
+        }
+      }
     }
 
     function formatCost(value) {
@@ -696,8 +833,8 @@
           Array.from({ length: cols }, () => (Math.random() < density ? 0 : 1))
         );
 
-        const start = { row: 0, col: 0 };
-        const goal = { row: rows - 1, col: cols - 1 };
+        const start = { row: Math.floor(Math.random() * rows), col: 0 };
+        const goal = { row: Math.floor(Math.random() * rows), col: cols - 1 };
         grid[start.row][start.col] = 1;
         grid[goal.row][goal.col] = 1;
 
@@ -847,8 +984,11 @@
         if (firstSuccessfulResult) {
           state.path = firstSuccessfulResult.path;
           state.pathCost = firstSuccessfulResult.path_cost ?? 0;
-          // Future improvement: draw different algorithm paths in different colors.
-          updateStatus(`Showing the first successful backend route from ${firstSuccessfulResult.algorithm_name} with cost ${formatCost(state.pathCost)}.`);
+          const successfulAlgorithms = payload.results
+            .filter(result => result.path_found)
+            .map(result => result.algorithm_name)
+            .join(", ");
+          updateStatus(`Showing backend routes for: ${successfulAlgorithms}.`);
         } else {
           state.path = [];
           state.pathCost = 0;
@@ -953,32 +1093,7 @@
         svg.appendChild(line);
       }
 
-      if (state.path.length > 0) {
-        const polyline = document.createElementNS(SVG_NS, "polyline");
-        polyline.setAttribute(
-          "points",
-          state.path
-            .map(point => `${MARGIN + point.col * CELL_SIZE},${MARGIN + point.row * CELL_SIZE}`)
-            .join(" ")
-        );
-        polyline.setAttribute("fill", "none");
-        polyline.setAttribute("stroke", "var(--path)");
-        polyline.setAttribute("stroke-width", "8");
-        polyline.setAttribute("stroke-linecap", "round");
-        polyline.setAttribute("stroke-linejoin", "round");
-        svg.appendChild(polyline);
-
-        for (const point of state.path) {
-          const node = document.createElementNS(SVG_NS, "circle");
-          node.setAttribute("cx", String(MARGIN + point.col * CELL_SIZE));
-          node.setAttribute("cy", String(MARGIN + point.row * CELL_SIZE));
-          node.setAttribute("r", "8");
-          node.setAttribute("fill", "var(--path)");
-          node.setAttribute("stroke", "#ffffff");
-          node.setAttribute("stroke-width", "2");
-          svg.appendChild(node);
-        }
-      }
+      renderRoutes(svg, getDisplayedRoutes());
 
       for (let row = 0; row < rows; row += 1) {
         const y = MARGIN + row * CELL_SIZE;
@@ -1021,7 +1136,13 @@
           intersectionZone.setAttribute("cy", String(y));
           intersectionZone.setAttribute("r", "18");
           intersectionZone.setAttribute("class", "click-zone");
-          intersectionZone.addEventListener("click", () => setIntersection(row, col));
+          intersectionZone.addEventListener("click", () => {
+            if (blockMode) {
+              toggleCell(row, col);
+              return;
+            }
+            setIntersection(row, col);
+          });
           svg.appendChild(intersectionZone);
         }
       }
@@ -1033,8 +1154,11 @@
       goalChip.textContent = `B: (${state.goal.row}, ${state.goal.col})`;
       movesChip.textContent = `Moves: ${Math.max(state.path.length - 1, 0)}`;
       trafficChip.textContent = `Traffic: ${state.trafficEnabled ? "On" : "Off"}`;
-      routeText.textContent = state.path.length
-        ? `${state.path.map(point => `(${point.row}, ${point.col})`).join(" -> ")} | cost ${formatCost(state.pathCost)}`
+      const displayedRoutes = getDisplayedRoutes();
+      routeText.textContent = displayedRoutes.length > 0
+        ? displayedRoutes
+            .map(route => `${route.algorithm}: ${route.path.map(point => `(${point.row}, ${point.col})`).join(" -> ")} | cost ${formatCost(route.cost)}`)
+            .join(" || ")
         : "No route found for the current layout.";
     }
 
@@ -1151,7 +1275,13 @@
     });
 
     clearComparisonResults();
-    findPathInBrowser();
+    if (!generateRandomGrid(Number(rowsInput.value), Number(colsInput.value), Number(densityInput.value) / 100)) {
+      updateStatus("Could not generate the initial grid. Try refreshing or lowering roadblock density.");
+      findPathInBrowser();
+    } else {
+      updateStatus("Generated a fresh grid with random start and goal points.");
+      findPathInBrowser();
+    }
   </script>
 </body>
 </html>
