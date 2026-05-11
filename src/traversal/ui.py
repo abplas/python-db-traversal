@@ -7,6 +7,7 @@ from traversal.grid import Point
 
 
 BLOCKED_COLOR = "#d9dde3"
+TRAFFIC_COLOR = "#fde68a"
 PATH_COLOR = "#d97706"
 START_COLOR = "#16a34a"
 GOAL_COLOR = "#dc2626"
@@ -48,6 +49,7 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       --muted: {MUTED_TEXT};
       --line: {GRID_LINE_COLOR};
       --blocked: {BLOCKED_COLOR};
+      --traffic: {TRAFFIC_COLOR};
       --path: {PATH_COLOR};
       --start: {START_COLOR};
       --goal: {GOAL_COLOR};
@@ -373,6 +375,7 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
         <div class="chip" id="start-chip">A: (0, 0)</div>
         <div class="chip" id="goal-chip">B: (0, 0)</div>
         <div class="chip" id="moves-chip">Moves: 0</div>
+        <div class="chip" id="traffic-chip">Traffic: Off</div>
       </div>
     </section>
 
@@ -384,6 +387,7 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       <div class="legend-item"><span class="swatch" style="background:{START_COLOR};"></span>Point A</div>
       <div class="legend-item"><span class="swatch" style="background:{GOAL_COLOR};"></span>Point B</div>
       <div class="legend-item"><span class="swatch" style="background:{PATH_COLOR};"></span>Route</div>
+      <div class="legend-item"><span class="swatch" style="background:{TRAFFIC_COLOR};"></span>Directional traffic</div>
       <div class="legend-item"><span class="swatch" style="background:{BLOCKED_COLOR};"></span>Blocked</div>
     </section>
 
@@ -399,12 +403,12 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
 
         <div class="field">
           <label for="rows">Rows: <output id="rows-value">5</output></label>
-          <input id="rows" type="range" min="4" max="10" value="5" />
+          <input id="rows" type="range" min="4" max="30" value="5" />
         </div>
 
         <div class="field">
           <label for="cols">Columns: <output id="cols-value">7</output></label>
-          <input id="cols" type="range" min="4" max="12" value="7" />
+          <input id="cols" type="range" min="4" max="40" value="7" />
         </div>
       </div>
 
@@ -436,6 +440,8 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       <div class="actions">
         <button class="primary" id="find-route">Run selected algorithms</button>
         <button id="generate-grid">Generate new grid</button>
+        <button id="toggle-traffic">Directional traffic: Off</button>
+        <button id="randomize-traffic">Randomize traffic flow</button>
         <button id="toggle-block-mode">Roadblock edit: Off</button>
         <button id="clear-blocks">Clear roadblocks</button>
       </div>
@@ -464,6 +470,9 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
             <th>Expanded</th>
             <th>Frontier Pushes</th>
             <th>Path Cost</th>
+            <th>Nodes</th>
+            <th>Edges</th>
+            <th>Time Complexity</th>
           </tr>
         </thead>
         <tbody id="comparison-body"></tbody>
@@ -474,7 +483,7 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
   <script>
     const INITIAL_STATE = {json.dumps(initial_state)};
     const API_URL = "http://127.0.0.1:8000/run-pathfinding";
-    const CELL_SIZE = 72;
+    const CELL_SIZE = 48;
     const MARGIN = 56;
     const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -483,7 +492,10 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       start: {{ ...INITIAL_STATE.start }},
       goal: {{ ...INITIAL_STATE.goal }},
       path: [],
+      pathCost: 0,
       results: [],
+      trafficEnabled: false,
+      traffic: null,
     }};
 
     const svg = document.getElementById("grid-svg");
@@ -499,7 +511,9 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
     const startChip = document.getElementById("start-chip");
     const goalChip = document.getElementById("goal-chip");
     const movesChip = document.getElementById("moves-chip");
+    const trafficChip = document.getElementById("traffic-chip");
     const blockModeButton = document.getElementById("toggle-block-mode");
+    const trafficButton = document.getElementById("toggle-traffic");
     const comparisonTable = document.getElementById("comparison-table");
     const comparisonBody = document.getElementById("comparison-body");
     const comparisonEmpty = document.getElementById("comparison-empty");
@@ -577,13 +591,71 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
           <td>${{result.visited_count}}</td>
           <td>${{result.expanded_count}}</td>
           <td>${{result.frontier_pushes}}</td>
-          <td>${{result.path_cost ?? "N/A"}}</td>
+          <td>${{formatCost(result.path_cost)}}</td>
+          <td>${{result.metadata?.node_count ?? "N/A"}}</td>
+          <td>${{result.metadata?.edge_count ?? "N/A"}}</td>
+          <td>${{result.metadata?.time_complexity ?? "N/A"}}</td>
         `;
         comparisonBody.appendChild(row);
       }}
 
       comparisonEmpty.hidden = true;
       comparisonTable.hidden = false;
+    }}
+
+    function formatCost(value) {{
+      return value === null || value === undefined ? "N/A" : Number(value).toFixed(2).replace(/[.]00$/, "");
+    }}
+
+    function createNeutralTraffic(rows, cols) {{
+      const directions = ["north", "south", "east", "west"];
+      return Object.fromEntries(
+        directions.map(direction => [
+          direction,
+          Array.from({{ length: rows }}, () => Array.from({{ length: cols }}, () => 1))
+        ])
+      );
+    }}
+
+    function createDirectionalTraffic(rows, cols) {{
+      const traffic = createNeutralTraffic(rows, cols);
+      for (let row = 0; row < rows; row += 1) {{
+        for (let col = 0; col < cols; col += 1) {{
+          const eastBias = 1 + (col / Math.max(cols - 1, 1)) * 1.2;
+          const westBias = 1 + ((cols - 1 - col) / Math.max(cols - 1, 1)) * 1.2;
+          const southBias = 1 + (row / Math.max(rows - 1, 1)) * 0.9;
+          const northBias = 1 + ((rows - 1 - row) / Math.max(rows - 1, 1)) * 0.9;
+          traffic.east[row][col] = Number((eastBias + Math.random() * 0.35).toFixed(2));
+          traffic.west[row][col] = Number((westBias + Math.random() * 0.35).toFixed(2));
+          traffic.south[row][col] = Number((southBias + Math.random() * 0.35).toFixed(2));
+          traffic.north[row][col] = Number((northBias + Math.random() * 0.35).toFixed(2));
+        }}
+      }}
+      return traffic;
+    }}
+
+    function ensureTraffic() {{
+      const rows = state.grid.length;
+      const cols = state.grid[0].length;
+      if (!state.traffic) {{
+        state.traffic = createDirectionalTraffic(rows, cols);
+      }}
+    }}
+
+    function directionBetween(current, neighbor) {{
+      if (neighbor.row === current.row - 1 && neighbor.col === current.col) return "north";
+      if (neighbor.row === current.row + 1 && neighbor.col === current.col) return "south";
+      if (neighbor.row === current.row && neighbor.col === current.col + 1) return "east";
+      if (neighbor.row === current.row && neighbor.col === current.col - 1) return "west";
+      throw new Error("Only non-diagonal neighbors have traffic direction.");
+    }}
+
+    function movementCost(current, neighbor) {{
+      if (!state.trafficEnabled) {{
+        return 1;
+      }}
+      ensureTraffic();
+      return state.traffic[directionBetween(current, neighbor)][current.row][current.col];
     }}
 
     function getSelectedAlgorithms() {{
@@ -616,14 +688,15 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
 
         if (current.row === state.goal.row && current.col === state.goal.col) {{
           state.path = reconstructPath(cameFrom, current);
-          updateStatus(`Route found with ${{state.path.length - 1}} moves.`);
+          state.pathCost = costSoFar.get(pointKey(current));
+          updateStatus(`Route found with ${{state.path.length - 1}} moves and cost ${{formatCost(state.pathCost)}}.`);
           render();
           return state.path;
         }}
 
         for (const neighbor of neighbors(current)) {{
           const currentCost = costSoFar.get(pointKey(current));
-          const newCost = currentCost + 1;
+          const newCost = currentCost + movementCost(current, neighbor);
           const neighborKey = pointKey(neighbor);
 
           if (!costSoFar.has(neighborKey) || newCost < costSoFar.get(neighborKey)) {{
@@ -636,6 +709,7 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       }}
 
       state.path = [];
+      state.pathCost = 0;
       updateStatus("No route is available with the current roadblocks.");
       render();
       return null;
@@ -668,6 +742,8 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
         state.start = start;
         state.goal = goal;
         state.path = [];
+        state.pathCost = 0;
+        state.traffic = state.trafficEnabled ? createDirectionalTraffic(rows, cols) : null;
 
         if (pathExists()) {{
           return true;
@@ -791,6 +867,7 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
             start: state.start,
             goal: state.goal,
             algorithms: selectedAlgorithms,
+            traffic: state.trafficEnabled ? state.traffic : null,
           }}),
         }});
 
@@ -806,10 +883,12 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
         const firstSuccessfulResult = payload.results.find(result => result.path_found);
         if (firstSuccessfulResult) {{
           state.path = firstSuccessfulResult.path;
+          state.pathCost = firstSuccessfulResult.path_cost ?? 0;
           // Future improvement: draw different algorithm paths in different colors.
-          updateStatus(`Showing the first successful backend route from ${{firstSuccessfulResult.algorithm_name}}.`);
+          updateStatus(`Showing the first successful backend route from ${{firstSuccessfulResult.algorithm_name}} with cost ${{formatCost(state.pathCost)}}.`);
         }} else {{
           state.path = [];
+          state.pathCost = 0;
           updateStatus("The backend ran successfully, but no algorithm found a route.");
         }}
 
@@ -843,6 +922,33 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       background.setAttribute("height", String(svgHeight));
       background.setAttribute("fill", "#ffffff");
       svg.appendChild(background);
+
+      if (state.trafficEnabled) {{
+        ensureTraffic();
+        for (let row = 0; row < rows; row += 1) {{
+          for (let col = 0; col < cols; col += 1) {{
+            if (state.grid[row][col] !== 1) continue;
+            const x = MARGIN + col * CELL_SIZE;
+            const y = MARGIN + row * CELL_SIZE;
+            const avgTraffic = (
+              state.traffic.north[row][col] +
+              state.traffic.south[row][col] +
+              state.traffic.east[row][col] +
+              state.traffic.west[row][col]
+            ) / 4;
+            if (avgTraffic <= 1.25) continue;
+            const marker = document.createElementNS(SVG_NS, "rect");
+            marker.setAttribute("x", String(x - CELL_SIZE * 0.28));
+            marker.setAttribute("y", String(y - CELL_SIZE * 0.28));
+            marker.setAttribute("width", String(CELL_SIZE * 0.56));
+            marker.setAttribute("height", String(CELL_SIZE * 0.56));
+            marker.setAttribute("rx", "6");
+            marker.setAttribute("fill", "var(--traffic)");
+            marker.setAttribute("opacity", String(Math.min(0.7, 0.18 + (avgTraffic - 1) / 3)));
+            svg.appendChild(marker);
+          }}
+        }}
+      }}
 
       for (let row = 0; row < rows; row += 1) {{
         for (let col = 0; col < cols; col += 1) {{
@@ -963,8 +1069,9 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       startChip.textContent = `A: (${{state.start.row}}, ${{state.start.col}})`;
       goalChip.textContent = `B: (${{state.goal.row}}, ${{state.goal.col}})`;
       movesChip.textContent = `Moves: ${{Math.max(state.path.length - 1, 0)}}`;
+      trafficChip.textContent = `Traffic: ${{state.trafficEnabled ? "On" : "Off"}}`;
       routeText.textContent = state.path.length
-        ? state.path.map(point => `(${{point.row}}, ${{point.col}})`).join(" -> ")
+        ? `${{state.path.map(point => `(${{point.row}}, ${{point.col}})`).join(" -> ")}} | cost ${{formatCost(state.pathCost)}}`
         : "No route found for the current layout.";
     }}
 
@@ -1047,6 +1154,25 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
     }});
 
     document.getElementById("clear-blocks").addEventListener("click", clearRoadblocks);
+
+    trafficButton.addEventListener("click", () => {{
+      state.trafficEnabled = !state.trafficEnabled;
+      if (state.trafficEnabled) {{
+        ensureTraffic();
+      }}
+      trafficButton.textContent = `Directional traffic: ${{state.trafficEnabled ? "On" : "Off"}}`;
+      clearComparisonResults("Traffic flow changed. Run the backend comparison again to refresh the table.");
+      findPathInBrowser();
+    }});
+
+    document.getElementById("randomize-traffic").addEventListener("click", () => {{
+      state.trafficEnabled = true;
+      state.traffic = createDirectionalTraffic(state.grid.length, state.grid[0].length);
+      trafficButton.textContent = "Directional traffic: On";
+      updateStatus("Generated direction-based traffic flow for the current grid.");
+      clearComparisonResults("Traffic flow changed. Run the backend comparison again to refresh the table.");
+      findPathInBrowser();
+    }});
 
     blockModeButton.addEventListener("click", () => {{
       blockMode = !blockMode;

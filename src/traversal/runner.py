@@ -31,10 +31,13 @@ def get_algorithm(name: str) -> AlgorithmFunction:
         ) from exc
 
 
-def _ensure_grid_map(grid: GridMap | list[list[int]]) -> GridMap:
+def _ensure_grid_map(
+    grid: GridMap | list[list[int]],
+    traffic: dict[str, list[list[float]]] | None = None,
+) -> GridMap:
     if isinstance(grid, GridMap):
         return grid
-    return GridMap(grid)
+    return GridMap(grid, traffic=traffic)
 
 
 def _normalize_algorithm_names(names: str | Iterable[str]) -> list[str]:
@@ -58,9 +61,10 @@ def run_algorithm(
     grid: GridMap | list[list[int]],
     start: Point,
     goal: Point,
+    traffic: dict[str, list[list[float]]] | None = None,
 ) -> PathfindingResult:
     algorithm = get_algorithm(name)
-    return algorithm(_ensure_grid_map(grid), start, goal)
+    return algorithm(_ensure_grid_map(grid, traffic), start, goal)
 
 
 def run_algorithms(
@@ -68,8 +72,9 @@ def run_algorithms(
     grid: GridMap | list[list[int]],
     start: Point,
     goal: Point,
+    traffic: dict[str, list[list[float]]] | None = None,
 ) -> list[PathfindingResult]:
-    grid_map = _ensure_grid_map(grid)
+    grid_map = _ensure_grid_map(grid, traffic)
     normalized_names = _normalize_algorithm_names(names)
     return [get_algorithm(name)(grid_map, start, goal) for name in normalized_names]
 
@@ -78,8 +83,9 @@ def run_all_algorithms(
     grid: GridMap | list[list[int]],
     start: Point,
     goal: Point,
+    traffic: dict[str, list[list[float]]] | None = None,
 ) -> list[PathfindingResult]:
-    return run_algorithms("all", grid, start, goal)
+    return run_algorithms("all", grid, start, goal, traffic=traffic)
 
 
 def run_pathfinding_request(
@@ -87,9 +93,10 @@ def run_pathfinding_request(
     start: Point,
     goal: Point,
     algorithms: str | Iterable[str],
+    traffic: dict[str, list[list[float]]] | None = None,
 ) -> dict[str, object]:
     normalized_names = _normalize_algorithm_names(algorithms)
-    results = run_algorithms(normalized_names, grid, start, goal)
+    results = run_algorithms(normalized_names, grid, start, goal, traffic=traffic)
     return {
         "start": point_to_dict(start),
         "goal": point_to_dict(goal),

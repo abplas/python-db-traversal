@@ -25,6 +25,10 @@ class UiTests(unittest.TestCase):
         self.assertIn("dijkstra", html)
         self.assertIn("Algorithm comparison", html)
         self.assertIn("Runtime ms", html)
+        self.assertIn('max="30"', html)
+        self.assertIn('max="40"', html)
+        self.assertIn("Directional traffic", html)
+        self.assertIn("Time Complexity", html)
 
 
 if __name__ == "__main__":

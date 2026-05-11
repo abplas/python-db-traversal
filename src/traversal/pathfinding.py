@@ -28,10 +28,24 @@ def _validate_endpoints(grid_map: GridMap, start: Point, goal: Point) -> None:
         raise ValueError("Goal point must be on a traversable road cell.")
 
 
+def _complexity_metadata(grid_map: GridMap) -> dict[str, object]:
+    node_count = grid_map.traversable_count()
+    edge_count = grid_map.directed_edge_count()
+    return {
+        "node_count": node_count,
+        "edge_count": edge_count,
+        "time_complexity": "O((V + E) log V)",
+        "space_complexity": "O(V)",
+        "complexity_variables": {"V": node_count, "E": edge_count},
+    }
+
+
 def _build_result(
     *,
+    grid_map: GridMap,
     algorithm_name: str,
     path: list[Point],
+    path_cost: float | None,
     runtime_ms: int,
     visited_count: int,
     expanded_count: int,
@@ -39,9 +53,9 @@ def _build_result(
     metadata: dict[str, object] | None = None,
 ) -> PathfindingResult:
     path_found = bool(path)
-    path_cost = len(path) - 1 if path_found else None
     path_length_nodes = len(path)
     moves = max(path_length_nodes - 1, 0) if path_found else 0
+    result_metadata = {**_complexity_metadata(grid_map), **dict(metadata or {})}
     return PathfindingResult(
         algorithm_name=algorithm_name,
         path=path,
@@ -53,7 +67,7 @@ def _build_result(
         visited_count=visited_count,
         expanded_count=expanded_count,
         frontier_pushes=frontier_pushes,
-        metadata=dict(metadata or {}),
+        metadata=result_metadata,
     )
 
 
@@ -63,17 +77,17 @@ def _run_priority_search(
     goal: Point,
     *,
     algorithm_name: str,
-    heuristic: Callable[[Point, Point], int],
+    heuristic: Callable[[Point, Point], float],
     metadata: dict[str, object] | None = None,
 ) -> PathfindingResult:
     _validate_endpoints(grid_map, start, goal)
 
     start_time_ns = perf_counter_ns()
-    frontier: list[tuple[int, Point]] = []
+    frontier: list[tuple[float, Point]] = []
     heappush(frontier, (0, start))
 
     came_from: dict[Point, Point] = {}
-    cost_so_far: dict[Point, int] = {start: 0}
+    cost_so_far: dict[Point, float] = {start: 0.0}
     frontier_pushes = 1
     expanded_count = 0
 
@@ -84,8 +98,10 @@ def _run_priority_search(
         if current == goal:
             runtime_ms = (perf_counter_ns() - start_time_ns) // 1_000_000
             return _build_result(
+                grid_map=grid_map,
                 algorithm_name=algorithm_name,
                 path=reconstruct_path(came_from, current),
+                path_cost=cost_so_far[current],
                 runtime_ms=runtime_ms,
                 visited_count=len(cost_so_far),
                 expanded_count=expanded_count,
@@ -94,7 +110,7 @@ def _run_priority_search(
             )
 
         for neighbor in grid_map.neighbors(current):
-            new_cost = cost_so_far[current] + 1
+            new_cost = cost_so_far[current] + grid_map.movement_cost(current, neighbor)
             if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
                 cost_so_far[neighbor] = new_cost
                 priority = new_cost + heuristic(neighbor, goal)
@@ -104,8 +120,10 @@ def _run_priority_search(
 
     runtime_ms = (perf_counter_ns() - start_time_ns) // 1_000_000
     return _build_result(
+        grid_map=grid_map,
         algorithm_name=algorithm_name,
         path=[],
+        path_cost=None,
         runtime_ms=runtime_ms,
         visited_count=len(cost_so_far),
         expanded_count=expanded_count,
@@ -122,7 +140,7 @@ def a_star(grid_map: GridMap, start: Point, goal: Point) -> PathfindingResult:
         goal,
         algorithm_name="astar",
         heuristic=manhattan_distance,
-        metadata={"heuristic": "manhattan"},
+        metadata={"heuristic": "manhattan", "uses_directional_traffic": True},
     )
 
 
@@ -134,7 +152,7 @@ def dijkstra(grid_map: GridMap, start: Point, goal: Point) -> PathfindingResult:
         goal,
         algorithm_name="dijkstra",
         heuristic=lambda _point, _goal: 0,
-        metadata={"heuristic": None},
+        metadata={"heuristic": None, "uses_directional_traffic": True},
     )
 
 
