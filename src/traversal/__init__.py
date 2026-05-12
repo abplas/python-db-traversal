@@ -13,6 +13,7 @@ from .pathfinding import (
     weighted_astar,
 )
 from .runner import (
+    build_pathfinding_response,
     get_algorithm,
     get_algorithm_spec,
     list_algorithm_metadata,
@@ -22,7 +23,24 @@ from .runner import (
     run_all_algorithms,
     run_pathfinding_request,
 )
+from .repository import (
+    build_point_to_node_id,
+    check_database_connection,
+    create_map,
+    create_route_experiment,
+    get_algorithm_comparison_summary,
+    get_algorithm_performance_summary,
+    get_experiment_results,
+    get_run_path,
+    list_experiments_for_map,
+    list_maps,
+    load_map_graph,
+    load_nodes_for_map,
+    save_generated_map,
+    save_algorithm_run_with_path,
+)
 from .serialization import build_algorithm_run_row, build_run_path_node_rows
+from .supabase_client import get_supabase_client
 from .ui import launch_demo_ui
 
 __all__ = [
@@ -38,6 +56,7 @@ __all__ = [
     "weighted_astar",
     "evaluate_path_cost",
     "find_path",
+    "build_pathfinding_response",
     "get_algorithm",
     "get_algorithm_spec",
     "list_algorithm_metadata",
@@ -46,6 +65,21 @@ __all__ = [
     "run_algorithms",
     "run_all_algorithms",
     "run_pathfinding_request",
+    "get_supabase_client",
+    "check_database_connection",
+    "list_maps",
+    "create_map",
+    "load_nodes_for_map",
+    "build_point_to_node_id",
+    "save_generated_map",
+    "load_map_graph",
+    "list_experiments_for_map",
+    "create_route_experiment",
+    "save_algorithm_run_with_path",
+    "get_algorithm_comparison_summary",
+    "get_experiment_results",
+    "get_algorithm_performance_summary",
+    "get_run_path",
     "build_algorithm_run_row",
     "build_run_path_node_rows",
     "launch_demo_ui",

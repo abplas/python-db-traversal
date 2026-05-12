@@ -41,3 +41,23 @@
 -- from algorithm_comparison_summary
 -- where experiment_id = '<experiment-id>'
 -- order by cost_rank, speed_rank;
+
+
+-- Example 5: compare recent saved-map history lookups before/after
+-- idx_maps_created_at.
+--
+-- explain analyze
+-- select id, name, slug, description, created_at
+-- from maps
+-- order by created_at desc
+-- limit 20;
+
+
+-- Example 6: compare per-map experiment history lookups before/after
+-- idx_route_experiments_map_created_at.
+--
+-- explain analyze
+-- select *
+-- from route_experiments
+-- where map_id = '<map-id>'
+-- order by created_at desc;

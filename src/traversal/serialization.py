@@ -18,7 +18,9 @@ def _resolve_node_id(
         return point_to_node_id[point_key]
 
     raise ValueError(
-        f"Missing node id mapping for point ({point.row}, {point.col})."
+        "Missing node id mapping for point "
+        f"({point.row}, {point.col}). Database nodes do not match the grid "
+        "coordinates for this map."
     )
 
 
@@ -66,7 +68,7 @@ def build_algorithm_run_row(
 def build_run_path_node_rows(
     result: PathfindingResult,
     *,
-    run_id: str,
+    run_id: str | None = None,
     point_to_node_id: dict[Point | tuple[int, int], str],
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
@@ -75,14 +77,14 @@ def build_run_path_node_rows(
         raise ValueError("PathfindingResult cumulative costs must match the path length.")
 
     for step_index, point in enumerate(result.path):
-        rows.append(
-            {
-                "run_id": run_id,
-                "node_id": _resolve_node_id(point, point_to_node_id),
-                "step_index": step_index,
-                "cumulative_cost": float(cumulative_costs[step_index]),
-                "reached": result.path_found and step_index == len(result.path) - 1,
-            }
-        )
+        row = {
+            "node_id": _resolve_node_id(point, point_to_node_id),
+            "step_index": step_index,
+            "cumulative_cost": float(cumulative_costs[step_index]),
+            "reached": result.path_found and step_index == len(result.path) - 1,
+        }
+        if run_id is not None:
+            row["run_id"] = run_id
+        rows.append(row)
 
     return rows
