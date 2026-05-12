@@ -39,6 +39,12 @@ class UiTests(unittest.TestCase):
         self.assertIn("Randomize stoplights", html)
         self.assertIn("Stoplight Density", html)
         self.assertIn("Stoplights:", html)
+        self.assertIn("Save graph", html)
+        self.assertIn("Load saved graphs", html)
+        self.assertIn("Save results to database", html)
+        self.assertIn("Saved graph history", html)
+        self.assertIn("point_node_pairs", html)
+        self.assertIn("loadSelectedMapGraph", html)
 
 
 if __name__ == "__main__":

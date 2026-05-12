@@ -240,6 +240,26 @@ def _attach_comparison_metrics(
     return payload_results, best_path_cost, fastest_runtime_ms
 
 
+def build_pathfinding_response(
+    *,
+    start: Point,
+    goal: Point,
+    selected_algorithms: list[str],
+    results: list[PathfindingResult],
+) -> dict[str, object]:
+    payload_results, best_path_cost, fastest_runtime_ms = _attach_comparison_metrics(
+        results
+    )
+    return {
+        "start": point_to_dict(start),
+        "goal": point_to_dict(goal),
+        "selected_algorithms": selected_algorithms,
+        "best_path_cost": best_path_cost,
+        "fastest_runtime_ms": fastest_runtime_ms,
+        "results": payload_results,
+    }
+
+
 def run_algorithm(
     name: str,
     grid: GridMap | list[list[int]],
@@ -297,14 +317,9 @@ def run_pathfinding_request(
         traffic=traffic,
         stoplights=stoplights,
     )
-    payload_results, best_path_cost, fastest_runtime_ms = _attach_comparison_metrics(
-        results
+    return build_pathfinding_response(
+        start=start,
+        goal=goal,
+        selected_algorithms=normalized_names,
+        results=results,
     )
-    return {
-        "start": point_to_dict(start),
-        "goal": point_to_dict(goal),
-        "selected_algorithms": normalized_names,
-        "best_path_cost": best_path_cost,
-        "fastest_runtime_ms": fastest_runtime_ms,
-        "results": payload_results,
-    }

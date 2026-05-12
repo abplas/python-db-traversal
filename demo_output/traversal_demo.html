@@ -113,6 +113,9 @@
     }
 
     input[type="range"],
+    input[type="text"],
+    textarea,
+    select,
     button {
       width: 100%;
       font: inherit;
@@ -134,6 +137,20 @@
       background: #111827;
       color: #ffffff;
       border-color: #111827;
+    }
+
+    input[type="text"],
+    textarea,
+    select {
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      color: var(--text);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 72px;
     }
 
     .hint {
@@ -327,6 +344,12 @@
       font-size: 0.92rem;
     }
 
+    .database-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+
     @media (max-width: 860px) {
       .topbar {
         align-items: start;
@@ -459,6 +482,55 @@
     </section>
 
     <section class="panel comparison-panel">
+      <h2>Database</h2>
+      <div class="database-grid">
+        <div class="field">
+          <label for="map-name">Map name</label>
+          <input id="map-name" type="text" value="Generated Manhattan Map" />
+        </div>
+        <div class="field">
+          <label for="map-slug">Map slug</label>
+          <input id="map-slug" type="text" value="generated-manhattan-map" />
+        </div>
+        <div class="field">
+          <label for="map-description">Description</label>
+          <textarea id="map-description">Generated from the traversal demo grid.</textarea>
+        </div>
+        <div class="field">
+          <label class="checkbox-chip">
+            <input type="checkbox" id="save-results-toggle" />
+            <span>Save results to database</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="save-graph">Save graph</button>
+        <button id="load-saved-graphs">Load saved graphs</button>
+        <button id="load-selected-graph">Load selected graph</button>
+        <button id="load-graph-history">Load graph history</button>
+      </div>
+
+      <div class="database-grid">
+        <div class="field">
+          <label for="saved-map-select">Saved maps</label>
+          <select id="saved-map-select">
+            <option value="">No saved maps loaded</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="experiment-select">Experiments</label>
+          <select id="experiment-select">
+            <option value="">No experiment selected</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="status" id="database-status-text">Database status: graph not saved yet.</div>
+      <div class="status info" id="saved-map-summary">No saved map selected.</div>
+    </section>
+
+    <section class="panel comparison-panel">
       <h2>Algorithm comparison</h2>
       <div class="comparison-empty" id="comparison-empty">
         Run the backend comparison to see BFS, A*, Dijkstra, Greedy Best-First, Weighted A*, or all registered algorithms side by side.
@@ -483,11 +555,34 @@
         <tbody id="comparison-body"></tbody>
       </table>
     </section>
+
+    <section class="panel comparison-panel">
+      <h2>Saved graph history</h2>
+      <div class="comparison-empty" id="history-empty">
+        Load a saved graph and select an experiment to view stored algorithm history.
+      </div>
+      <table id="history-table" hidden>
+        <thead>
+          <tr>
+            <th>Algorithm</th>
+            <th>Status</th>
+            <th>Total Cost</th>
+            <th>Runtime ms</th>
+            <th>Cost Rank</th>
+            <th>Speed Rank</th>
+            <th>Reliability</th>
+            <th>Speed Label</th>
+          </tr>
+        </thead>
+        <tbody id="history-body"></tbody>
+      </table>
+    </section>
   </main>
 
   <script>
-    const INITIAL_STATE = {"grid": [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1], [1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1], [1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1], [1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1], [1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0], [1, 0, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1], [1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1], [1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1], [1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1], [0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0], [1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1], [0, 0, 1, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 0], [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1], [1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1], [1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1]], "start": {"row": 9, "col": 0}, "goal": {"row": 5, "col": 39}};
+    const INITIAL_STATE = {"grid": [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1], [1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1], [1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1], [1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1], [1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1], [1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1], [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1], [1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1], [0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1], [1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1], [1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1], [1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1], [1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1], [1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1], [1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1], [0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1], [1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1], [1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1]], "start": {"row": 1, "col": 0}, "goal": {"row": 2, "col": 39}};
     const API_URL = "http://127.0.0.1:8000/run-pathfinding";
+    const MAPS_URL = "http://127.0.0.1:8000/maps";
     const CELL_SIZE = 48;
     const MARGIN = 56;
     const SVG_NS = "http://www.w3.org/2000/svg";
@@ -502,6 +597,10 @@
       trafficEnabled: false,
       traffic: null,
       stoplights: {},
+      savedMapId: null,
+      savedMapPointToNodeId: {},
+      savedMaps: [],
+      experiments: [],
     };
 
     const svg = document.getElementById("grid-svg");
@@ -516,6 +615,8 @@
     const routeText = document.getElementById("route-text");
     const statusText = document.getElementById("status-text");
     const apiStatusText = document.getElementById("api-status-text");
+    const databaseStatusText = document.getElementById("database-status-text");
+    const savedMapSummary = document.getElementById("saved-map-summary");
     const startChip = document.getElementById("start-chip");
     const goalChip = document.getElementById("goal-chip");
     const movesChip = document.getElementById("moves-chip");
@@ -527,7 +628,16 @@
     const comparisonTable = document.getElementById("comparison-table");
     const comparisonBody = document.getElementById("comparison-body");
     const comparisonEmpty = document.getElementById("comparison-empty");
+    const historyTable = document.getElementById("history-table");
+    const historyBody = document.getElementById("history-body");
+    const historyEmpty = document.getElementById("history-empty");
     const runAllCheckbox = document.getElementById("algorithm-all");
+    const saveResultsToggle = document.getElementById("save-results-toggle");
+    const mapNameInput = document.getElementById("map-name");
+    const mapSlugInput = document.getElementById("map-slug");
+    const mapDescriptionInput = document.getElementById("map-description");
+    const savedMapSelect = document.getElementById("saved-map-select");
+    const experimentSelect = document.getElementById("experiment-select");
     const individualAlgorithmCheckboxes = [
       document.getElementById("algorithm-bfs"),
       document.getElementById("algorithm-dfs"),
@@ -552,6 +662,22 @@
 
     function pointKey(point) {
       return `${point.row},${point.col}`;
+    }
+
+    function slugify(text) {
+      return String(text || "")
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    }
+
+    function mappingPairsToLookup(pairs) {
+      const mapping = {};
+      for (const pair of pairs || []) {
+        mapping[`${pair.row},${pair.col}`] = pair.node_id;
+      }
+      return mapping;
     }
 
     function serializeStoplights() {
@@ -599,6 +725,33 @@
       apiStatusText.classList.add(tone);
     }
 
+    function setDatabaseStatus(message, tone = "info") {
+      databaseStatusText.textContent = message;
+      databaseStatusText.classList.remove("info", "active", "error");
+      databaseStatusText.classList.add(tone);
+    }
+
+    function updateSavedMapSummary(message = null) {
+      if (message) {
+        savedMapSummary.textContent = message;
+        return;
+      }
+
+      if (!state.savedMapId) {
+        savedMapSummary.textContent = "No saved map selected.";
+        return;
+      }
+
+      savedMapSummary.textContent = `Saved map: ${savedMapSelect.options[savedMapSelect.selectedIndex]?.text || state.savedMapId} | id ${state.savedMapId}`;
+    }
+
+    function clearHistoryResults(message = "Load a saved graph and select an experiment to view stored algorithm history.") {
+      historyBody.innerHTML = "";
+      historyTable.hidden = true;
+      historyEmpty.hidden = false;
+      historyEmpty.textContent = message;
+    }
+
     function clearComparisonResults(message = "Run the backend comparison to see BFS, A*, Dijkstra, Greedy Best-First, Weighted A*, or all registered algorithms side by side.") {
       state.results = [];
       comparisonBody.innerHTML = "";
@@ -639,6 +792,36 @@
 
       comparisonEmpty.hidden = true;
       comparisonTable.hidden = false;
+    }
+
+    function renderHistoryResults(results) {
+      historyBody.innerHTML = "";
+
+      for (const result of results) {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${formatLabel(result.algorithm)}</td>
+          <td>${formatLabel(result.status)}</td>
+          <td>${formatCost(result.total_cost)}</td>
+          <td>${result.runtime_ms ?? "N/A"}</td>
+          <td>${result.cost_rank ?? "N/A"}</td>
+          <td>${result.speed_rank ?? "N/A"}</td>
+          <td>${formatLabel(result.reliability_label)}</td>
+          <td>${formatLabel(result.speed_label)}</td>
+        `;
+        historyBody.appendChild(row);
+      }
+
+      historyEmpty.hidden = true;
+      historyTable.hidden = false;
+    }
+
+    function markGraphUnsaved(reason = "Current graph has unsaved changes.") {
+      state.savedMapId = null;
+      state.savedMapPointToNodeId = {};
+      saveResultsToggle.checked = false;
+      updateSavedMapSummary(reason);
+      setDatabaseStatus("Database status: current graph is not saved.", "info");
     }
 
     function getDisplayedRoutes() {
@@ -841,6 +1024,224 @@
         return state.traffic[directionBetween(current, neighbor)][current.row][current.col];
       })();
       return trafficCost + stoplightDelay(neighbor);
+    }
+
+    function trafficHasWeightedValues(traffic) {
+      if (!traffic) {
+        return false;
+      }
+      for (const direction of ["north", "south", "east", "west"]) {
+        for (const row of traffic[direction] || []) {
+          for (const value of row) {
+            if (Number(value) !== 1) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+    function chooseDefaultEndpoints() {
+      const traversable = [];
+      for (let row = 0; row < state.grid.length; row += 1) {
+        for (let col = 0; col < state.grid[0].length; col += 1) {
+          if (state.grid[row][col] === 1) {
+            traversable.push({ row, col });
+          }
+        }
+      }
+
+      if (traversable.length === 0) {
+        return;
+      }
+
+      traversable.sort((a, b) => (a.col - b.col) || (a.row - b.row));
+      state.start = traversable[0];
+      state.goal = traversable[traversable.length - 1];
+    }
+
+    async function loadSavedMaps() {
+      setDatabaseStatus("Loading saved maps from Supabase...", "active");
+      try {
+        const response = await fetch(MAPS_URL);
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.detail || "Could not load saved maps.");
+        }
+
+        state.savedMaps = payload.maps || [];
+        savedMapSelect.innerHTML = "";
+        if (state.savedMaps.length === 0) {
+          savedMapSelect.innerHTML = '<option value="">No saved maps found</option>';
+          updateSavedMapSummary("No saved maps found yet.");
+        } else {
+          for (const map of state.savedMaps) {
+            const option = document.createElement("option");
+            option.value = map.id;
+            option.textContent = `${map.name} (${map.slug})`;
+            savedMapSelect.appendChild(option);
+          }
+          if (state.savedMapId) {
+            savedMapSelect.value = state.savedMapId;
+          }
+          updateSavedMapSummary("Saved maps loaded. Choose one to load its graph or history.");
+        }
+        setDatabaseStatus("Saved maps loaded from Supabase.", "active");
+      } catch (error) {
+        setDatabaseStatus(`Could not load saved maps: ${error.message}`, "error");
+      }
+    }
+
+    async function saveCurrentGraph() {
+      const name = mapNameInput.value.trim() || "Generated Manhattan Map";
+      const slug = mapSlugInput.value.trim() || slugify(name) || `generated-map-${Date.now()}`;
+      mapNameInput.value = name;
+      mapSlugInput.value = slug;
+
+      setDatabaseStatus("Saving current graph to Supabase...", "active");
+      try {
+        const response = await fetch(MAPS_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name,
+            slug,
+            description: mapDescriptionInput.value.trim() || null,
+            grid: state.grid,
+            traffic: state.trafficEnabled ? state.traffic : null,
+            stoplights: serializeStoplights(),
+            metadata: {
+              generated_from_demo: true,
+              traffic_enabled: state.trafficEnabled,
+              stoplight_count: serializeStoplights().length,
+            },
+          }),
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.detail || "Could not save graph.");
+        }
+
+        state.savedMapId = payload.map_id;
+        state.savedMapPointToNodeId = mappingPairsToLookup(payload.point_node_pairs);
+        savedMapSelect.innerHTML = `<option value="${payload.map_id}">${payload.map?.name || name} (${payload.map?.slug || slug})</option>`;
+        savedMapSelect.value = payload.map_id;
+        updateSavedMapSummary(`Saved graph '${payload.map?.name || name}' with ${payload.node_count} nodes and ${payload.edge_count} directed edges.`);
+        setDatabaseStatus("Graph saved to Supabase.", "active");
+        await loadSavedMaps();
+        await loadMapExperiments(payload.map_id);
+      } catch (error) {
+        setDatabaseStatus(`Could not save graph: ${error.message}`, "error");
+      }
+    }
+
+    async function loadSelectedMapGraph() {
+      const mapId = savedMapSelect.value;
+      if (!mapId) {
+        setDatabaseStatus("Choose a saved map before loading it.", "error");
+        return;
+      }
+
+      setDatabaseStatus("Loading saved graph from Supabase...", "active");
+      try {
+        const response = await fetch(`${MAPS_URL}/${mapId}`);
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.detail || "Could not load the saved graph.");
+        }
+
+        state.grid = payload.grid || [[]];
+        state.traffic = payload.traffic;
+        state.trafficEnabled = trafficHasWeightedValues(payload.traffic);
+        state.stoplights = {};
+        for (const signal of payload.traffic_signals || []) {
+          if (signal.row === null || signal.col === null || signal.row === undefined || signal.col === undefined) {
+            continue;
+          }
+          state.stoplights[`${signal.row},${signal.col}`] = {
+            row: signal.row,
+            col: signal.col,
+            average_wait_seconds: signal.average_wait_seconds,
+            light_cycle_seconds: signal.light_cycle_seconds,
+            has_stoplight: true,
+            metadata: signal.metadata || {},
+          };
+        }
+        state.savedMapId = mapId;
+        state.savedMapPointToNodeId = mappingPairsToLookup(payload.point_node_pairs || []);
+        mapNameInput.value = payload.map?.name || mapNameInput.value;
+        mapSlugInput.value = payload.map?.slug || mapSlugInput.value;
+        mapDescriptionInput.value = payload.map?.description || "";
+        chooseDefaultEndpoints();
+        clearComparisonResults("Loaded a saved graph. Run algorithms again to compare fresh results.");
+        clearHistoryResults("Saved experiment history loaded below when available.");
+        findPathInBrowser();
+        updateSavedMapSummary(`Loaded saved map '${payload.map?.name || mapId}'.`);
+        setDatabaseStatus("Saved graph loaded from Supabase.", "active");
+        await loadMapExperiments(mapId);
+      } catch (error) {
+        setDatabaseStatus(`Could not load saved graph: ${error.message}`, "error");
+      }
+    }
+
+    async function loadMapExperiments(mapId = savedMapSelect.value) {
+      if (!mapId) {
+        clearHistoryResults("Choose a saved graph before loading history.");
+        return;
+      }
+
+      try {
+        const response = await fetch(`${MAPS_URL}/${mapId}/experiments`);
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.detail || "Could not load experiment history.");
+        }
+
+        state.experiments = payload.experiments || [];
+        experimentSelect.innerHTML = "";
+        if (state.experiments.length === 0) {
+          experimentSelect.innerHTML = '<option value="">No experiments saved yet</option>';
+          clearHistoryResults("This saved graph has no experiment history yet.");
+          return;
+        }
+
+        for (const experiment of state.experiments) {
+          const option = document.createElement("option");
+          option.value = experiment.id;
+          option.textContent = `${experiment.id} | traffic ${experiment.traffic_enabled ? "on" : "off"} | stoplights ${experiment.stoplights_enabled ? "on" : "off"}`;
+          experimentSelect.appendChild(option);
+        }
+        await loadSelectedExperimentResults();
+      } catch (error) {
+        clearHistoryResults(`Could not load graph history: ${error.message}`);
+      }
+    }
+
+    async function loadSelectedExperimentResults() {
+      const experimentId = experimentSelect.value;
+      if (!experimentId) {
+        clearHistoryResults("Choose an experiment to view saved algorithm history.");
+        return;
+      }
+
+      try {
+        const response = await fetch(`http://127.0.0.1:8000/experiments/${experimentId}/results`);
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.detail || "Could not load experiment results.");
+        }
+        const results = payload.results || [];
+        if (results.length === 0) {
+          clearHistoryResults("This experiment has no stored comparison rows.");
+          return;
+        }
+        renderHistoryResults(results);
+      } catch (error) {
+        clearHistoryResults(`Could not load experiment results: ${error.message}`);
+      }
     }
 
     function getSelectedAlgorithms() {
@@ -1064,6 +1465,7 @@
       if (state.grid[row][col] === 0) {
         delete state.stoplights[pointKey({ row, col })];
       }
+      markGraphUnsaved("Current graph has unsaved roadblock changes.");
       clearComparisonResults("Grid changed. Run the backend comparison again to refresh the table.");
       findPathInBrowser();
     }
@@ -1102,6 +1504,7 @@
         updateStatus(`Added a ${DEFAULT_STOPLIGHT_DELAY}-second stoplight delay at (${row}, ${col}).`);
       }
 
+      markGraphUnsaved("Current graph has unsaved stoplight changes.");
       clearComparisonResults("Stoplights changed. Run the backend comparison again to refresh the table.");
       findPathInBrowser();
     }
@@ -1134,6 +1537,7 @@
       state.grid = state.grid.map(row => row.map(() => 1));
       state.grid[state.start.row][state.start.col] = 1;
       state.grid[state.goal.row][state.goal.col] = 1;
+      markGraphUnsaved("Current graph has unsaved roadblock changes.");
       updateStatus("All roadblocks cleared.");
       clearComparisonResults("Roadblocks changed. Run the backend comparison again to refresh the table.");
       findPathInBrowser();
@@ -1149,20 +1553,41 @@
 
       setApiStatus("Backend request running...", "active");
 
+      const requestBody = {
+        grid: state.grid,
+        start: state.start,
+        goal: state.goal,
+        algorithms: selectedAlgorithms,
+        traffic: state.trafficEnabled ? state.traffic : null,
+        stoplights: serializeStoplights(),
+      };
+
+      if (saveResultsToggle.checked) {
+        if (!state.savedMapId) {
+          setApiStatus("Save the graph to the database before saving algorithm results.", "error");
+          return;
+        }
+
+        const startNodeId = state.savedMapPointToNodeId[pointKey(state.start)];
+        const endNodeId = state.savedMapPointToNodeId[pointKey(state.goal)];
+        if (!startNodeId || !endNodeId) {
+          setApiStatus("The selected start or goal point does not exist in the saved map nodes. Reload or re-save the graph first.", "error");
+          return;
+        }
+
+        requestBody.save = true;
+        requestBody.map_id = state.savedMapId;
+        requestBody.start_node_id = startNodeId;
+        requestBody.end_node_id = endNodeId;
+      }
+
       try {
         const response = await fetch(API_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            grid: state.grid,
-            start: state.start,
-            goal: state.goal,
-            algorithms: selectedAlgorithms,
-            traffic: state.trafficEnabled ? state.traffic : null,
-            stoplights: serializeStoplights(),
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         const payload = await response.json();
@@ -1191,6 +1616,10 @@
 
         render();
         setApiStatus("Backend request succeeded.", "active");
+        if (payload.experiment_id) {
+          setDatabaseStatus(`Saved experiment ${payload.experiment_id} and ${Object.keys(payload.saved_run_ids || {}).length} algorithm runs.`, "active");
+          await loadMapExperiments(state.savedMapId);
+        }
       } catch (error) {
         clearComparisonResults("No backend comparison results are available yet.");
         findPathInBrowser();
@@ -1419,6 +1848,16 @@
       stoplightDensityValue.textContent = stoplightDensityInput.value + "%";
     });
 
+    mapNameInput.addEventListener("input", () => {
+      if (!mapSlugInput.dataset.userEdited) {
+        mapSlugInput.value = slugify(mapNameInput.value);
+      }
+    });
+
+    mapSlugInput.addEventListener("input", () => {
+      mapSlugInput.dataset.userEdited = "true";
+    });
+
     runAllCheckbox.addEventListener("change", () => {
       if (runAllCheckbox.checked) {
         individualAlgorithmCheckboxes.forEach(checkbox => {
@@ -1436,6 +1875,20 @@
     });
 
     document.getElementById("find-route").addEventListener("click", runBackendPathfinding);
+    document.getElementById("save-graph").addEventListener("click", saveCurrentGraph);
+    document.getElementById("load-saved-graphs").addEventListener("click", loadSavedMaps);
+    document.getElementById("load-selected-graph").addEventListener("click", loadSelectedMapGraph);
+    document.getElementById("load-graph-history").addEventListener("click", () => loadMapExperiments(savedMapSelect.value));
+    savedMapSelect.addEventListener("change", () => {
+      state.savedMapId = savedMapSelect.value || null;
+      updateSavedMapSummary(
+        state.savedMapId
+          ? "Saved map selected. Load the graph or history when ready."
+          : "No saved map selected."
+      );
+      clearHistoryResults();
+    });
+    experimentSelect.addEventListener("change", loadSelectedExperimentResults);
 
     document.getElementById("generate-grid").addEventListener("click", () => {
       const rows = Number(rowsInput.value);
@@ -1444,6 +1897,7 @@
       const success = generateRandomGrid(rows, cols, density);
 
       if (success) {
+        markGraphUnsaved("Generated a new unsaved graph.");
         updateStatus("Generated a new grid and found a valid route.");
         clearComparisonResults("Grid changed. Run the backend comparison again to refresh the table.");
         findPathInBrowser();
@@ -1463,6 +1917,7 @@
       stoplightMode = false;
       stoplightModeButton.textContent = "Stoplight edit: Off";
       trafficButton.textContent = `Directional traffic: ${state.trafficEnabled ? "On" : "Off"}`;
+      markGraphUnsaved("Current graph has unsaved traffic changes.");
       clearComparisonResults("Traffic flow changed. Run the backend comparison again to refresh the table.");
       findPathInBrowser();
     });
@@ -1471,6 +1926,7 @@
       state.trafficEnabled = true;
       state.traffic = createDirectionalTraffic(state.grid.length, state.grid[0].length);
       trafficButton.textContent = "Directional traffic: On";
+      markGraphUnsaved("Current graph has unsaved traffic changes.");
       updateStatus("Generated direction-based traffic flow for the current grid.");
       clearComparisonResults("Traffic flow changed. Run the backend comparison again to refresh the table.");
       findPathInBrowser();
@@ -1478,6 +1934,7 @@
 
     document.getElementById("randomize-stoplights").addEventListener("click", () => {
       generateRandomStoplights();
+      markGraphUnsaved("Current graph has unsaved stoplight changes.");
       updateStatus("Generated stoplights on available four-way intersections.");
       clearComparisonResults("Stoplights changed. Run the backend comparison again to refresh the table.");
       findPathInBrowser();
@@ -1514,10 +1971,12 @@
     });
 
     clearComparisonResults();
+    clearHistoryResults();
     if (!generateRandomGrid(Number(rowsInput.value), Number(colsInput.value), Number(densityInput.value) / 100)) {
       updateStatus("Could not generate the initial grid. Try refreshing or lowering roadblock density.");
       findPathInBrowser();
     } else {
+      markGraphUnsaved("Generated a fresh graph that is not yet saved.");
       updateStatus("Generated a fresh grid with random start and goal points.");
       findPathInBrowser();
     }
