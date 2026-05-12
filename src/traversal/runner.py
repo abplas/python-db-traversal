@@ -9,6 +9,7 @@ from traversal.models import PathfindingResult, point_to_dict
 from traversal.pathfinding import (
     a_star,
     bfs,
+    dfs,
     dijkstra,
     greedy_best_first,
     weighted_astar,
@@ -48,6 +49,15 @@ ALGORITHM_REGISTRY: dict[str, AlgorithmSpec] = {
         optimality="optimal_for_unweighted_moves_only",
         category="baseline",
         tradeoff="fast/simple but may be poor when traffic or stoplights matter",
+    ),
+    "dfs": AlgorithmSpec(
+        key="dfs",
+        display_name="DFS",
+        function=dfs,
+        supports_weights=False,
+        optimality="not_guaranteed",
+        category="exploratory",
+        tradeoff="useful for reachability but does not guarantee the shortest or lowest-cost route",
     ),
     "dijkstra": AlgorithmSpec(
         key="dijkstra",

@@ -22,6 +22,7 @@ class UiTests(unittest.TestCase):
 
         self.assertIn("/run-pathfinding", html)
         self.assertIn("bfs", html)
+        self.assertIn("dfs", html)
         self.assertIn("astar", html)
         self.assertIn("dijkstra", html)
         self.assertIn("greedy_best_first", html)

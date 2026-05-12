@@ -88,6 +88,7 @@ class ApiTests(unittest.TestCase):
                     **self.request_body,
                     "algorithms": [
                         "bfs",
+                        "dfs",
                         "astar",
                         "dijkstra",
                         "greedy_best_first",
@@ -100,15 +101,15 @@ class ApiTests(unittest.TestCase):
         else:
             payload = run_pathfinding(
                 self._build_request(
-                    ["bfs", "astar", "dijkstra", "greedy_best_first", "weighted_astar"]
+                    ["bfs", "dfs", "astar", "dijkstra", "greedy_best_first", "weighted_astar"]
                 )
             )
 
         self.assertEqual(
             payload["selected_algorithms"],
-            ["bfs", "astar", "dijkstra", "greedy_best_first", "weighted_astar"],
+            ["bfs", "dfs", "astar", "dijkstra", "greedy_best_first", "weighted_astar"],
         )
-        self.assertEqual(len(payload["results"]), 5)
+        self.assertEqual(len(payload["results"]), 6)
         self.assertEqual(payload["results"][0]["algorithm_name"], "bfs")
         self.assertEqual(payload["results"][-1]["algorithm_name"], "weighted_astar")
         self.assertIn("best_path_cost", payload)

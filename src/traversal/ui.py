@@ -54,6 +54,7 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       --stoplight: {STOPLIGHT_COLOR};
       --path: {PATH_COLOR};
       --route-bfs: #2563eb;
+      --route-dfs: #9333ea;
       --route-astar: #d97706;
       --route-dijkstra: #0f766e;
       --route-greedy: #db2777;
@@ -397,6 +398,7 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
       <div class="legend-item"><span class="swatch" style="background:{GOAL_COLOR};"></span>Point B</div>
       <div class="legend-item"><span class="swatch" style="background:{PATH_COLOR};"></span>Route</div>
       <div class="legend-item"><span class="swatch" style="background:var(--route-bfs);"></span>BFS route</div>
+      <div class="legend-item"><span class="swatch" style="background:var(--route-dfs);"></span>DFS route</div>
       <div class="legend-item"><span class="swatch" style="background:var(--route-astar);"></span>A* route</div>
       <div class="legend-item"><span class="swatch" style="background:var(--route-dijkstra);"></span>Dijkstra route</div>
       <div class="legend-item"><span class="swatch" style="background:var(--route-greedy);"></span>Greedy route</div>
@@ -440,6 +442,10 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
             <label class="checkbox-chip">
               <input type="checkbox" id="algorithm-bfs" name="algorithm" value="bfs" />
               <span>BFS</span>
+            </label>
+            <label class="checkbox-chip">
+              <input type="checkbox" id="algorithm-dfs" name="algorithm" value="dfs" />
+              <span>DFS</span>
             </label>
             <label class="checkbox-chip">
               <input type="checkbox" id="algorithm-astar" name="algorithm" value="astar" checked />
@@ -562,6 +568,7 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
     const runAllCheckbox = document.getElementById("algorithm-all");
     const individualAlgorithmCheckboxes = [
       document.getElementById("algorithm-bfs"),
+      document.getElementById("algorithm-dfs"),
       document.getElementById("algorithm-astar"),
       document.getElementById("algorithm-dijkstra"),
       document.getElementById("algorithm-greedy-best-first"),
@@ -701,6 +708,7 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
     function getRouteColor(algorithmName, index) {{
       const normalized = String(algorithmName).toLowerCase();
       if (normalized === "bfs") return "var(--route-bfs)";
+      if (normalized === "dfs") return "var(--route-dfs)";
       if (normalized === "astar") return "var(--route-astar)";
       if (normalized === "dijkstra") return "var(--route-dijkstra)";
       if (normalized === "greedy_best_first") return "var(--route-greedy)";
@@ -708,6 +716,7 @@ def build_demo_html(grid: list[list[int]], start: Point, goal: Point) -> str:
 
       const fallbackColors = [
         "var(--route-bfs)",
+        "var(--route-dfs)",
         "var(--route-astar)",
         "var(--route-dijkstra)",
         "var(--route-greedy)",

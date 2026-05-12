@@ -41,3 +41,23 @@
 -- from algorithm_comparison_summary
 -- where experiment_id = '<experiment-id>'
 -- order by cost_rank, speed_rank;
+
+-- Example 5: compare DFS runs inside an experiment before/after
+-- idx_algorithm_runs_experiment_algorithm.
+--
+-- explain analyze
+-- select *
+-- from algorithm_runs
+-- where experiment_id = '<experiment-id>'
+--   and algorithm = 'dfs';
+
+
+-- Example 6: newest experiments for one map before/after
+-- idx_route_experiments_map_created_at.
+--
+-- explain analyze
+-- select *
+-- from route_experiments
+-- where map_id = '<map-id>'
+-- order by created_at desc
+-- limit 10;
