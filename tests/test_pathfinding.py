@@ -13,6 +13,7 @@ from traversal import (
     a_star,
     bfs,
     build_algorithm_run_row,
+    dfs,
     build_run_path_node_rows,
     dijkstra,
     evaluate_path_cost,
@@ -77,6 +78,17 @@ class PathfindingTests(unittest.TestCase):
         self.assertEqual(
             result.metadata["optimality"], "optimal_for_unweighted_moves_only"
         )
+
+    def test_dfs_finds_a_path_on_simple_grid(self) -> None:
+        result = dfs(self.simple_grid, self.start, self.goal)
+
+        self.assertTrue(result.path_found)
+        self.assertEqual(result.algorithm_name, "dfs")
+        self.assertEqual(result.path[0], self.start)
+        self.assertEqual(result.path[-1], self.goal)
+        self.assertEqual(result.metadata["supports_weights"], False)
+        self.assertEqual(result.metadata["optimality"], "not_guaranteed")
+        self.assertEqual(result.metadata["time_complexity"], "O(V + E)")
 
     def test_greedy_best_first_finds_a_path(self) -> None:
         result = greedy_best_first(self.simple_grid, self.start, self.goal)
@@ -326,7 +338,7 @@ class PathfindingTests(unittest.TestCase):
 
     def test_run_algorithms_runs_multiple_selected_algorithms(self) -> None:
         results = run_algorithms(
-            ["bfs", "astar", "dijkstra", "greedy_best_first", "weighted_astar"],
+            ["bfs", "dfs", "astar", "dijkstra", "greedy_best_first", "weighted_astar"],
             self.simple_grid,
             self.start,
             self.goal,
@@ -334,7 +346,7 @@ class PathfindingTests(unittest.TestCase):
 
         self.assertEqual(
             [result.algorithm_name for result in results],
-            ["bfs", "astar", "dijkstra", "greedy_best_first", "weighted_astar"],
+            ["bfs", "dfs", "astar", "dijkstra", "greedy_best_first", "weighted_astar"],
         )
 
     def test_run_all_algorithms_runs_every_registered_algorithm(self) -> None:
@@ -347,7 +359,7 @@ class PathfindingTests(unittest.TestCase):
         )
         self.assertEqual(
             list_algorithms(),
-            ["bfs", "dijkstra", "astar", "greedy_best_first", "weighted_astar"],
+            ["bfs", "dfs", "dijkstra", "astar", "greedy_best_first", "weighted_astar"],
         )
 
     def test_invalid_algorithm_name_raises_clear_error(self) -> None:
@@ -369,13 +381,13 @@ class PathfindingTests(unittest.TestCase):
             self.simple_grid,
             self.start,
             self.goal,
-            ["bfs", "astar", "dijkstra"],
+            ["bfs", "dfs", "astar", "dijkstra"],
         )
 
         self.assertEqual(payload["start"], {"row": 0, "col": 0})
         self.assertEqual(payload["goal"], {"row": 2, "col": 2})
-        self.assertEqual(payload["selected_algorithms"], ["bfs", "astar", "dijkstra"])
-        self.assertEqual(len(payload["results"]), 3)
+        self.assertEqual(payload["selected_algorithms"], ["bfs", "dfs", "astar", "dijkstra"])
+        self.assertEqual(len(payload["results"]), 4)
         self.assertIn("best_path_cost", payload)
         self.assertIn("fastest_runtime_ms", payload)
         self.assertIn("comparison_label", payload["results"][0])

@@ -315,6 +315,76 @@ def bfs(grid_map: GridMap, start: Point, goal: Point) -> PathfindingResult:
     )
 
 
+def dfs(grid_map: GridMap, start: Point, goal: Point) -> PathfindingResult:
+    """Find a route using depth-first search for reachability exploration."""
+    _validate_endpoints(grid_map, start, goal)
+
+    start_time_ns = perf_counter_ns()
+    frontier = [start]
+    visited = {start}
+    came_from: dict[Point, Point] = {}
+    frontier_pushes = 1
+    expanded_count = 0
+
+    while frontier:
+        current = frontier.pop()
+        expanded_count += 1
+
+        if current == goal:
+            runtime_ms = (perf_counter_ns() - start_time_ns) // 1_000_000
+            path = reconstruct_path(came_from, current)
+            return _build_result(
+                grid_map=grid_map,
+                algorithm_name="dfs",
+                path=path,
+                runtime_ms=runtime_ms,
+                visited_count=len(visited),
+                expanded_count=expanded_count,
+                frontier_pushes=frontier_pushes,
+                metadata={
+                    "display_name": "DFS",
+                    "heuristic": None,
+                    "supports_weights": False,
+                    "search_model": "depth_first_reachability",
+                    "optimality": "not_guaranteed",
+                    "reliability_category": "exploratory",
+                    "tradeoff": "useful for reachability but does not guarantee the shortest or lowest-cost route",
+                    "time_complexity": "O(V + E)",
+                    "space_complexity": "O(V)",
+                },
+            )
+
+        for neighbor in reversed(grid_map.neighbors(current)):
+            if neighbor in visited:
+                continue
+            visited.add(neighbor)
+            came_from[neighbor] = current
+            frontier.append(neighbor)
+            frontier_pushes += 1
+
+    runtime_ms = (perf_counter_ns() - start_time_ns) // 1_000_000
+    return _build_result(
+        grid_map=grid_map,
+        algorithm_name="dfs",
+        path=[],
+        runtime_ms=runtime_ms,
+        visited_count=len(visited),
+        expanded_count=expanded_count,
+        frontier_pushes=frontier_pushes,
+        metadata={
+            "display_name": "DFS",
+            "heuristic": None,
+            "supports_weights": False,
+            "search_model": "depth_first_reachability",
+            "optimality": "not_guaranteed",
+            "reliability_category": "exploratory",
+            "tradeoff": "useful for reachability but does not guarantee the shortest or lowest-cost route",
+            "time_complexity": "O(V + E)",
+            "space_complexity": "O(V)",
+        },
+    )
+
+
 def greedy_best_first(grid_map: GridMap, start: Point, goal: Point) -> PathfindingResult:
     """Find a route using only the heuristic to decide what to explore next."""
     return _run_greedy_best_first(

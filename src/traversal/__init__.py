@@ -5,6 +5,7 @@ from .models import PathfindingResult
 from .pathfinding import (
     a_star,
     bfs,
+    dfs,
     dijkstra,
     evaluate_path_cost,
     find_path,
@@ -30,6 +31,7 @@ __all__ = [
     "Stoplight",
     "PathfindingResult",
     "bfs",
+    "dfs",
     "a_star",
     "dijkstra",
     "greedy_best_first",
